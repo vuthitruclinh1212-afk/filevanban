@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { DocumentData, DocumentTheme } from '../types';
+import { convertMarkdownToDocx } from './markdownToDocx';
 
 // Helper to sanitize file names
 export function sanitizeFilename(name: string): string {
@@ -67,127 +68,7 @@ export async function exportWord(
   theme: DocumentTheme,
   returnBlobOnly = false
 ): Promise<Blob> {
-  const paragraphs = docData.content
-    .split('\n')
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-
-  const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1 inch = 1440 dxa
-          },
-        },
-        children: [
-          // Document Header / Title
-          new Paragraph({
-            text: docData.title || 'Tài Liệu Văn Bản',
-            heading: HeadingLevel.TITLE,
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 160 },
-            run: {
-              color: theme.primaryHex,
-              bold: true,
-              size: 40, // 20pt
-            },
-          }),
-
-          // Subtitle
-          ...(docData.subtitle
-            ? [
-                new Paragraph({
-                  text: docData.subtitle,
-                  alignment: AlignmentType.CENTER,
-                  spacing: { after: 200 },
-                  run: {
-                    italics: true,
-                    color: theme.accentHex,
-                    size: 24, // 12pt
-                  },
-                }),
-              ]
-            : []),
-
-          // Metadata Tag Box
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-            children: [
-              new TextRun({
-                text: `[ Chủ đề: ${theme.name} ] `,
-                color: theme.accentHex,
-                bold: true,
-                size: 20,
-              }),
-              ...(docData.author
-                ? [
-                    new TextRun({
-                      text: `• Tác giả: ${docData.author} `,
-                      color: '64748B',
-                      size: 20,
-                    }),
-                  ]
-                : []),
-              ...(docData.date
-                ? [
-                    new TextRun({
-                      text: `• Ngày: ${docData.date}`,
-                      color: '64748B',
-                      size: 20,
-                    }),
-                  ]
-                : []),
-            ],
-          }),
-
-          // Decorative divider
-          new Paragraph({
-            text: '—'.repeat(40),
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 360 },
-            run: {
-              color: theme.primaryHex,
-              size: 18,
-            },
-          }),
-
-          // Body Paragraphs
-          ...paragraphs.map((p, index) => {
-            const isHeading = p.startsWith('#') || /^[0-9]+[.)]/.test(p);
-            return new Paragraph({
-              text: isHeading ? p.replace(/^#+\s*/, '') : p,
-              spacing: { after: isHeading ? 160 : 220, line: 360 }, // 1.5 line height
-              heading: isHeading ? HeadingLevel.HEADING_2 : undefined,
-              run: {
-                size: isHeading ? 28 : 24,
-                bold: isHeading,
-                color: isHeading
-                  ? theme.primaryHex
-                  : theme.id === 'fairytale'
-                  ? '1B263B'
-                  : theme.textHex,
-              },
-            });
-          }),
-
-          // Footer note
-          new Paragraph({
-            text: `Được tạo bởi Trình Định Dạng & Xuất Tài Liệu • Bản quyền mẫu: ${theme.name}`,
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 600 },
-            run: {
-              italics: true,
-              size: 18,
-              color: '94A3B8',
-            },
-          }),
-        ],
-      },
-    ],
-  });
-
+  const doc = convertMarkdownToDocx(docData, theme, docData.includeCoverPage ?? true);
   const blob = await Packer.toBlob(doc);
   if (!returnBlobOnly) {
     const filename = `${sanitizeFilename(docData.title)}_${theme.name}.docx`;

@@ -10,6 +10,7 @@ import {
   Maximize2,
   Sparkles,
 } from 'lucide-react';
+import { marked } from 'marked';
 import { DocumentData, DocumentTheme } from '../types';
 import { chunkContentForSlides } from '../services/documentExport';
 
@@ -25,7 +26,17 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   pdfContainerRef,
 }) => {
   const [activeTab, setActiveTab] = useState<'word' | 'pptx' | 'pdf' | 'xlsx'>('word');
+  const [wordViewMode, setWordViewMode] = useState<'content' | 'cover'>('content');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  const parsedMarkdownHtml = React.useMemo(() => {
+    if (!data.content.trim()) return '';
+    try {
+      return marked.parse(data.content, { gfm: true, breaks: true }) as string;
+    } catch (e) {
+      return data.content;
+    }
+  }, [data.content]);
 
   const paragraphs = data.content
     .split('\n')
@@ -123,87 +134,165 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       <div className="p-4 sm:p-6 bg-slate-100/70 min-h-[500px] flex items-center justify-center overflow-auto">
         {/* ===================== TAB 1: WORD PREVIEW ===================== */}
         {activeTab === 'word' && (
-          <div className="w-full max-w-[620px] bg-white rounded-lg shadow-lg border border-slate-200/90 p-8 sm:p-12 transition-all">
-            {/* Page Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 text-[11px] text-slate-400 font-sans mb-8">
-              <span>{data.title || 'Tài Liệu Văn Bản'}</span>
-              <span>Phong cách: {theme.name}</span>
-            </div>
-
-            {/* Document Title */}
-            <h1
-              className={`text-2xl sm:text-3xl font-bold text-center tracking-tight mb-2 ${theme.fontClassTitle}`}
-              style={{ color: `#${theme.primaryHex}` }}
-            >
-              {data.title || 'Tiêu Đề Tài Liệu'}
-            </h1>
-
-            {/* Subtitle */}
-            {data.subtitle && (
-              <p
-                className="text-center italic text-sm mb-4"
-                style={{ color: `#${theme.accentHex}` }}
-              >
-                {data.subtitle}
-              </p>
-            )}
-
-            {/* Metadata Pill */}
-            <div className="flex items-center justify-center flex-wrap gap-2 text-xs text-slate-500 mb-6">
-              <span
-                className="px-2.5 py-0.5 rounded-full font-semibold text-[11px]"
-                style={{
-                  backgroundColor: `#${theme.bgHex}20`,
-                  color: `#${theme.primaryHex}`,
-                }}
-              >
-                {theme.name}
+          <div className="w-full max-w-[640px] flex flex-col gap-3">
+            {/* View Mode Switcher: Cover Page vs Content */}
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Mô phỏng bản in Microsoft Word (.docx):
               </span>
-              {data.author && <span>• Tác giả: {data.author}</span>}
-              {data.date && <span>• Ngày: {data.date}</span>}
+              <div className="flex items-center gap-1 bg-slate-200/80 p-0.5 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setWordViewMode('content')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                    wordViewMode === 'content'
+                      ? 'bg-white text-indigo-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  📄 Trang Nội Dung
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWordViewMode('cover')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                    wordViewMode === 'cover'
+                      ? 'bg-white text-indigo-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  📖 Trang Bìa Cao Cấp
+                </button>
+              </div>
             </div>
 
-            {/* Decorative Divider */}
-            <div
-              className="w-24 h-0.5 mx-auto mb-8 rounded-full"
-              style={{ backgroundColor: `#${theme.primaryHex}` }}
-            />
+            {/* Simulated A4 Page */}
+            <div className="bg-white rounded-lg shadow-xl border border-slate-200/90 p-8 sm:p-12 transition-all min-h-[580px] flex flex-col justify-between">
+              {wordViewMode === 'cover' ? (
+                /* COVER PAGE VIEW */
+                <div className="flex flex-col items-center justify-center text-center my-auto py-8">
+                  <div
+                    className="text-xs font-bold tracking-widest uppercase mb-4 px-3 py-1 rounded-full border"
+                    style={{
+                      borderColor: `#${theme.primaryHex}40`,
+                      color: `#${theme.primaryHex}`,
+                      backgroundColor: `#${theme.primaryHex}10`,
+                    }}
+                  >
+                    ❖ BẢN BIÊN SOẠN CHUẨN XUẤT BẢN ❖
+                  </div>
 
-            {/* Body Text */}
-            <div
-              className={`space-y-4 text-sm leading-relaxed ${theme.fontClassBody}`}
-              style={{
-                color: theme.id === 'fairytale' ? '#1B263B' : `#${theme.textHex}`,
-              }}
-            >
-              {paragraphs.length > 0 ? (
-                paragraphs.map((para, index) => {
-                  const isHeading = para.startsWith('#') || /^[0-9]+[.)]/.test(para);
-                  return isHeading ? (
-                    <h2
-                      key={index}
-                      className="text-base font-bold pt-3 pb-1"
+                  <h1
+                    className={`text-2xl sm:text-4xl font-extrabold tracking-tight mb-3 ${theme.fontClassTitle}`}
+                    style={{ color: `#${theme.primaryHex}` }}
+                  >
+                    {data.title || 'Tiêu Đề Tài Liệu'}
+                  </h1>
+
+                  {data.subtitle && (
+                    <p
+                      className="italic text-sm sm:text-base mb-6 max-w-md font-medium"
+                      style={{ color: `#${theme.accentHex}` }}
+                    >
+                      {data.subtitle}
+                    </p>
+                  )}
+
+                  <div
+                    className="text-sm font-bold my-4"
+                    style={{ color: `#${theme.primaryHex}` }}
+                  >
+                    ✦ ──────────────── ✦
+                  </div>
+
+                  {/* Metadata Card Table */}
+                  <div className="w-full max-w-sm mt-8 border border-slate-200 rounded-xl overflow-hidden shadow-2xs text-left text-xs divide-y divide-slate-100 bg-slate-50/50">
+                    <div className="flex px-4 py-2.5">
+                      <span className="w-36 font-bold text-slate-500">Tác giả biên soạn:</span>
+                      <span className="font-semibold text-slate-900">{data.author || 'Chưa đặt'}</span>
+                    </div>
+                    <div className="flex px-4 py-2.5">
+                      <span className="w-36 font-bold text-slate-500">Đơn vị thực hiện:</span>
+                      <span className="text-slate-800">{data.organization || 'Hệ thống Quản trị Tài liệu'}</span>
+                    </div>
+                    <div className="flex px-4 py-2.5">
+                      <span className="w-36 font-bold text-slate-500">Ngày phát hành:</span>
+                      <span className="text-slate-800">{data.date || new Date().toLocaleDateString('vi-VN')}</span>
+                    </div>
+                    <div className="flex px-4 py-2.5">
+                      <span className="w-36 font-bold text-slate-500">Chủ đề thiết kế:</span>
+                      <span className="font-semibold" style={{ color: `#${theme.primaryHex}` }}>
+                        {theme.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 mt-12 italic">
+                    [ Ngắt trang sang nội dung chính tại Trang 2 ]
+                  </p>
+                </div>
+              ) : (
+                /* MAIN CONTENT VIEW */
+                <div>
+                  {/* Running Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-200 text-[11px] text-slate-400 font-sans mb-6">
+                    <span className="truncate max-w-[280px] font-medium">{data.title || 'Tài Liệu Văn Bản'}</span>
+                    <span className="italic">{theme.name} Edition</span>
+                  </div>
+
+                  {/* Title & Metadata Header */}
+                  <div className="mb-6 pb-4 border-b border-slate-100">
+                    <h1
+                      className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 ${theme.fontClassTitle}`}
                       style={{ color: `#${theme.primaryHex}` }}
                     >
-                      {para.replace(/^#+\s*/, '')}
-                    </h2>
-                  ) : (
-                    <p key={index} className="text-justify indent-6">
-                      {para}
-                    </p>
-                  );
-                })
-              ) : (
-                <p className="text-slate-400 italic text-center py-8">
-                  Chưa có nội dung văn bản. Hãy dán nội dung ở khung bên trái hoặc chọn mẫu có sẵn!
-                </p>
-              )}
-            </div>
+                      {data.title || 'Tiêu Đề Tài Liệu'}
+                    </h1>
+                    {data.subtitle && (
+                      <p className="italic text-sm font-medium mb-3" style={{ color: `#${theme.accentHex}` }}>
+                        {data.subtitle}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <span
+                        className="font-bold px-2 py-0.5 rounded text-[10px]"
+                        style={{ backgroundColor: `#${theme.primaryHex}15`, color: `#${theme.primaryHex}` }}
+                      >
+                        {theme.name}
+                      </span>
+                      {data.author && <span>• Tác giả: {data.author}</span>}
+                      {data.date && <span>• Ngày: {data.date}</span>}
+                    </div>
+                  </div>
 
-            {/* Page Footer */}
-            <div className="mt-12 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Được tạo bởi Trình Định Dạng Đa Năng</span>
-              <span>Trang 1 / 1</span>
+                  {/* Body Content with rich Markdown formatting */}
+                  {parsedMarkdownHtml ? (
+                    <div
+                      className={`markdown-preview ${theme.fontClassBody}`}
+                      style={
+                        {
+                          '--theme-primary': `#${theme.primaryHex}`,
+                          '--theme-accent': `#${theme.accentHex}`,
+                          color: theme.id === 'fairytale' ? '#1B263B' : `#${theme.textHex}`,
+                        } as React.CSSProperties
+                      }
+                      dangerouslySetInnerHTML={{ __html: parsedMarkdownHtml }}
+                    />
+                  ) : (
+                    <div className="text-center py-16 text-slate-400 italic text-sm">
+                      Chưa có nội dung văn bản. Hãy dán nội dung ở khung bên trái hoặc sử dụng tính năng "✨ AI Làm Đẹp & Cấu Trúc"!
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Running Footer with Page Numbers */}
+              <div className="mt-12 pt-3 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span>Trình Định Dạng & Xuất File Đa Năng</span>
+                <span>
+                  Trang {wordViewMode === 'cover' ? 'Bìa' : '2'} / {wordViewMode === 'cover' ? 'Tập' : '2'}
+                </span>
+              </div>
             </div>
           </div>
         )}

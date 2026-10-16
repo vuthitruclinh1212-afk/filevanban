@@ -2,5 +2,7 @@
   "name": "Trình Định Dạng & Xuất Tài Liệu Đa Năng",
   "description": "Công cụ định dạng và xuất tài liệu đa định dạng (Word .docx, PowerPoint .pptx, PDF .pdf, Excel .xlsx) theo các chủ đề thiết kế thẩm mỹ (Cổ tích, Cổ phong, Kẹo ngọt, Hiện đại).",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

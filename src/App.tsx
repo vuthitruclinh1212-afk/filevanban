@@ -155,6 +155,7 @@ export default function App() {
               data={documentData}
               onChange={handleUpdateDocument}
               onClear={() => handleUpdateDocument({ content: '' })}
+              currentThemeName={currentTheme.name}
             />
 
             {/* Export Toolbar */}

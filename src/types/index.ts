@@ -33,6 +33,7 @@ export interface DocumentData {
   watermark?: string;
   chunkMode: 'charLimit' | 'paragraph' | 'heading';
   maxCharsPerSlide: number;
+  includeCoverPage?: boolean;
 }
 
 export type ExportFormat = 'docx' | 'pptx' | 'pdf' | 'xlsx' | 'zip';

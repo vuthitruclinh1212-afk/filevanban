@@ -16,15 +16,33 @@ export const SAMPLE_CONTENTS: SampleContent[] = [
     themeId: 'fairytale',
     author: 'Nguyễn Thiên Vũ',
     organization: 'Hội Những Người Kể Chuyện Cổ Tích',
-    content: `Ngày xửa ngày xưa, tại một vùng đất nằm ẩn sau những làn sương bạc của Rừng Sao Băng, có một ngọn tháp cổ mang tên Tháp Thiên Cương.
+    content: `# Khởi Nguồn Vương Quốc Huyền Thoại
 
-Tại nơi ấy, các Tinh Linh Ánh Sáng canh giữ ngọn lửa vĩnh cửu – nguồn năng lượng duy trì sự ấm áp và bình yên cho khắp muôn loài trần thế.
+Ngày xửa ngày xưa, tại một vùng đất nằm ẩn sau những làn sương bạc của **Rừng Sao Băng**, có một ngọn tháp cổ mang tên **Tháp Thiên Cương**.
 
-Mỗi khi màn đêm buông xuống, những đóa hoa dạ nguyệt lại nở rộ, tỏa hương thơm ngát hòa cùng tiếng hát ngân vang của các vì tinh tú lấp lánh trên vòm trời cao vời vợi.
+> 💡 **Điểm Cốt Lõi:** Nơi đây lưu giữ ngọn lửa vĩnh cửu – cội nguồn duy trì sinh mệnh và bình yên cho khắp muôn loài trần thế.
 
-Chàng hiệp sĩ trẻ mang theo trái tim dũng cảm và thanh gươm nạm ngọc lưu ly, bước chân qua muôn trùng bão tuyết để tìm lại mảnh ngọc ước nguyện bị thời gian lãng quên.
+## 1. Bí Mật Của Các Vì Tinh Tú
 
-Cuộc hành trình không chỉ thử thách lòng kiên định mà còn mở ra những chân lý kỳ diệu về tình bạn, lòng bao dung và ánh sáng chân thật của tâm hồn.`,
+Mỗi khi màn đêm buông xuống, những đóa hoa *Dạ Nguyệt* lại nở rộ, tỏa hương thơm ngát hòa cùng tiếng hát ngân vang của các vì tinh tú lấp lánh trên vòm trời cao vời vợi.
+
+### 1.1 Các Báu Vật Thần Bí
+
+| Báu Vật | Thuộc Tính | Người Canh Giữ | Sức Mạnh |
+| :--- | :--- | :--- | :---: |
+| **Gương Nguyệt Quang** | Thủy | Nữ Thần Hồ Nước | Soi rọi chân tướng |
+| **Kiếm Lưu Ly** | Kim | Hiệp Sĩ Bão Tuyết | Chém đứt ảo ảnh |
+| **Đá Nguyện Ước** | Quang | Tinh Linh Trưởng | Hiện thực hóa ước mơ |
+
+## 2. Cuộc Hành Trình Tìm Lại Ánh Sáng
+
+Chàng hiệp sĩ trẻ mang theo trái tim dũng cảm bước chân qua muôn trùng bão tuyết:
+
+1. **Vượt qua Thung Lũng Gió Rít:** Thử thách lòng kiên trì trước những ảo ảnh ma mị.
+2. **Đối mặt với Quái Vật Băng Giá:** Dùng lòng trắc ẩn để hóa giải cơn giận dữ ngàn năm.
+3. **Thắp sáng Ngọn Hải Đăng:** Đưa ánh bình minh trở lại muôn nẻo nhân gian.
+
+> ❖ *"Ánh sáng chân thật nhất không nằm ở vì sao xa xôi, mà ẩn sâu trong trái tim người biết yêu thương."*`,
   },
   {
     id: 'cophong-sample',
@@ -33,15 +51,32 @@ Cuộc hành trình không chỉ thử thách lòng kiên định mà còn mở 
     themeId: 'cophong',
     author: 'Tuệ Tĩnh Cư Sĩ',
     organization: 'Thanh Phong Trà Quán',
-    content: `Mưa đầu mùa lất phất qua rèm trúc, thoảng hương trà sen sớm còn vương chút khói sương bảng lảng chốn hiên đình.
+    content: `# Thanh Phong Trà Luận
 
-Cổ nhân từng dạy: "Tâm tĩnh tắc thấu triệt, ý định tắc tự thông." Mỗi chén trà thanh tao là một nhịp thở chậm rãi giữa dòng đời vội vã.
+Mưa đầu mùa lất phất qua rèm trúc, thoảng hương trà sen sớm còn vương chút khói sương bảng lảng chốn hiên đình.
 
-Bên chiếc bàn gỗ mộc mạc, ngọn bút lông chấm mực tàu nhẹ nhàng lướt trên tờ giấy dó ngả vàng, phác họa lại dải mây chiều lãng đãng vờn qua đỉnh núi biếc.
+> 🎋 **Tâm Niệm:** Cổ nhân từng dạy: *"Tâm tĩnh tắc thấu triệt, ý định tắc tự thông."* Mỗi chén trà thanh tao là một nhịp thở chậm rãi giữa dòng đời vội vã.
 
-Tiếng đàn tranh réo rắt từ xa vọng lại, thanh thoát như nước chảy mây trôi, xua tan bao bụi trần và muộn phiền thường nhật.
+## 1. Tứ Đại Yếu Tố Của Một Tuần Trà
 
-Trăng thu soi sáng mặt hồ phẳng lặng như gương. Người ở lại thưởng chén thanh trà, lòng thong dong mỉm cười cùng vạn vật.`,
+Để pha được một tuần trà thanh nhã, cổ nhân đúc kết thành bốn yếu tố trọng yếu:
+
+- **Nhất Thủy:** Nước suối đầu nguồn hoặc sương mai đọng trên lá sen sớm.
+- **Nhì Trà:** Búp trà non được hái khi sương chưa tan, sấy lửa than hồng.
+- **Tam Bối:** Chén gốm nung men rạn giữ nhiệt và phô màu nước trà.
+- **Tứ Bình:** Ấm đất tử sa lưu hương bền lâu qua năm tháng.
+
+## 2. Bảng Phân Định Phong Vị Trà Cổ
+
+| Danh Trà | Xuất Xứ | Hương Vị | Công Dụng |
+| :--- | :--- | :--- | :--- |
+| **Trà Sen Tây Hồ** | Thăng Long | Thanh khiết, thơm ngát | Tĩnh tâm an thần |
+| **Trà Shan Tuyết** | Hà Giang | Đậm đà, hậu ngọt sâu | Bồi bổ khí huyết |
+| **Bạch Hạc Trà** | Thái Nguyên | Chát dịu, dư vị tinh tế | Khai thông trí tuệ |
+
+---
+
+> ❖ *"Trăng thu soi sáng mặt hồ phẳng lặng như gương. Người ở lại thưởng chén thanh trà, lòng thong dong mỉm cười cùng vạn vật."*`,
   },
   {
     id: 'candy-sample',
@@ -50,31 +85,54 @@ Trăng thu soi sáng mặt hồ phẳng lặng như gương. Người ở lại 
     themeId: 'candy',
     author: 'Lê Mai Anh',
     organization: 'Studio Kẹo Dẻo & Thiết Kế',
-    content: `Chào mừng bạn đến với vương quốc sắc màu pastel ngập tràn niềm vui và sự ngọt ngào!
+    content: `# Dự Án "Hộp Kẹo Niềm Vui"
 
-Hôm nay chúng mình cùng nhau phác thảo dự án "Hộp Kẹo Niềm Vui", mang lại nguồn cảm hứng tích cực cho mỗi ngày làm việc.
+Chào mừng bạn đến với thế giới ngập tràn sắc màu pastel ngọt ngào và năng lượng tích cực!
 
-Ý tưởng thiết kế chủ đạo: Tone hồng dâu ngọt lịm kết hợp cùng xanh bạc hà mát rượi, tạo cảm giác thư giãn và thân thiện như một que kem mùa hạ.
+> 🍬 **Thông Điệp Tươi Sáng:** Mỗi ngày làm việc là một viên kẹo ngọt mang đến niềm cảm hứng bất tận.
 
-Các hoạt động thú vị: Workshop làm nến thơm vị vanilla, sáng tạo sổ tay handmade và chia sẻ những câu chuyện ấm áp cùng bạn bè.
+## 1. Bảng Màu Thiết Kế Chủ Đạo
 
-Hãy luôn giữ nụ cười thật tươi trên môi và tô điểm cho cuộc sống bằng những điều đáng yêu nhất nhé!`,
+- 🍓 **Hồng Dâu Pastel:** Đại diện cho sự ấm áp, thân thiện và tươi vui.
+- 🍃 **Xanh Bạc Hà (Mint):** Cân bằng thị giác, tạo cảm giác tươi mát và thư thái.
+- 🍋 **Vàng Chanh Sữa:** Điểm nhấn sáng tạo, kích thích tư duy đổi mới.
+
+## 2. Kế Hoạch Triển Khai Hoạt Động
+
+| Hoạt Động | Thời Gian | Địa Điểm | Mục Tiêu |
+| :--- | :--- | :--- | :---: |
+| **Workshop Nến Thơm** | Thứ Bảy (09:00) | Studio Tầng 3 | 50 sản phẩm handmade |
+| **Sổ Tay Kỷ Niệm** | Chủ Nhật (14:00) | Vườn Thảo Mộc | Kết nối thành viên |
+| **Tiệc Trà Bánh Ngọt** | Cuối tháng | Sảnh Chính | Trao gửi yêu thương |
+
+> ✨ *Hãy luôn giữ nụ cười thật tươi trên môi và tô điểm cho cuộc sống bằng những điều đáng yêu nhất nhé!*`,
   },
   {
     id: 'minimal-sample',
-    title: 'Kế Hoạch Đổi Mới Kỹ Thuật Số',
-    subtitle: 'Chiến lược tối ưu hóa quy trình làm việc và tự động hóa tài liệu',
+    title: 'Báo Cáo Chiến Lược Chuyển Đổi Số',
+    subtitle: 'Chuẩn hóa quy trình tạo lập tài liệu tự động & tối ưu hiệu suất',
     themeId: 'minimal',
     author: 'Ban Chiến Lược Công Nghệ',
     organization: 'Tập Đoàn Giải Pháp Số',
-    content: `1. Mục tiêu chiến lược: Chuyển đổi toàn diện phương thức quản trị và lưu trữ tài liệu trong kỷ nguyên số.
+    content: `# Báo Cáo Tổng Quan Chiến Lược 2026
 
-2. Trọng tâm thực thi: Tự động hóa việc tạo lập văn bản chuẩn mực, báo cáo thuyết trình và dữ liệu bảng tính với tốc độ cao.
+Báo cáo phân tích lộ trình chuyển đổi phương thức biên soạn tài liệu truyền thống sang định dạng số hóa thông minh.
 
-3. Chuẩn hóa trải nghiệm: Đảm bảo tính nhất quán về thẩm mỹ, bảng màu nhận diện và độ chuẩn xác của font chữ trên mọi nền tảng Word, PowerPoint, Excel và PDF.
+> 💡 **Mục Tiêu Trọng Tâm:** Rút ngắn 85% thời gian dàn trang thủ công và nâng cao chỉ số chuẩn mực thẩm mỹ lên 99%.
 
-4. Đo lường hiệu quả: Giảm 85% thời gian định dạng thủ công và nâng cao sự hài lòng của các phòng ban nghiệp vụ.
+## 1. So Sánh Hiệu Suất Hệ Thống
 
-5. Định hướng tương lai: Tích hợp khả năng xuất dữ liệu theo thời gian thực và đồng bộ hóa đám mây đa thiết bị.`,
+| Chỉ Số Đánh Giá | Quy Trình Thủ Công | Trình Xuất File Đa Năng | Mức Cải Thiện |
+| :--- | :--- | :--- | :---: |
+| **Thời gian dàn trang** | 45 phút / tài liệu | 3 giây / tài liệu | **-93%** |
+| **Độ đồng bộ 4 định dạng** | Sai lệch font & lề | Chuẩn xác 100% | **Hoàn hảo** |
+| **Hỗ trợ Markdown** | Phải gõ lại từ đầu | Tự động nhận diện AST | **Tức thì** |
+| **Trang bìa & Header** | Tự tạo thủ công | Tự động chèn chuẩn mực | **100% tự động** |
+
+## 2. Các Bước Triển Khai Nghiệp Vụ
+
+1. **Nhập liệu thô:** Người dùng dán văn bản hoặc file Markdown bất kỳ.
+2. **Kích hoạt AI Enhancer:** Phân tích ngữ nghĩa, tự động chia đề mục và đóng hộp trích dẫn.
+3. **Kết xuất đa nền tảng:** Xuất tức thì ra Word (.docx), PowerPoint (.pptx), PDF (.pdf), Excel (.xlsx).`,
   },
 ];

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileEdit,
   Type,
@@ -9,6 +9,14 @@ import {
   Heading,
   ListPlus,
   Trash2,
+  Sparkles,
+  Table,
+  Quote,
+  Bold,
+  Loader2,
+  FileBadge,
+  CheckCircle2,
+  Wand2,
 } from 'lucide-react';
 import { DocumentData } from '../types';
 
@@ -16,22 +24,99 @@ interface DocumentEditorProps {
   data: DocumentData;
   onChange: (updates: Partial<DocumentData>) => void;
   onClear: () => void;
+  currentThemeName: string;
 }
 
 export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   data,
   onChange,
   onClear,
+  currentThemeName,
 }) => {
-  const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
 
   const wordCount = data.content.trim() ? data.content.trim().split(/\s+/).length : 0;
   const lineCount = data.content ? data.content.split('\n').filter((l) => l.trim()).length : 0;
 
-  const insertTextAtCursor = (prefix: string) => {
+  const insertText = (snippet: string) => {
     onChange({
-      content: data.content ? `${data.content}\n${prefix}` : prefix,
+      content: data.content ? `${data.content}\n\n${snippet}` : snippet,
     });
+  };
+
+  // AI-powered intelligent document restructuring & Markdown beautifier
+  const handleAiBeautify = async () => {
+    if (!data.content.trim()) {
+      alert('Vui lòng dán hoặc nhập nội dung văn bản trước khi yêu cầu AI làm đẹp!');
+      return;
+    }
+
+    setIsAiLoading(true);
+    setAiSuccessMsg(null);
+
+    try {
+      const res = await fetch('/api/ai/enhance-markdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawText: data.content,
+          title: data.title,
+          style: currentThemeName,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || 'Không thể xử lý văn bản');
+      }
+
+      if (result.markdown) {
+        onChange({ content: result.markdown });
+        setAiSuccessMsg('Đã tự động tái cấu trúc văn bản thành Markdown chuẩn xuất bản! ✨');
+        setTimeout(() => setAiSuccessMsg(null), 5000);
+      }
+    } catch (err: any) {
+      console.error(err);
+      // Fallback rule-based beautifier if API fails
+      handleRuleBasedBeautify();
+      setAiSuccessMsg('Đã chuẩn hóa văn bản theo quy chuẩn Markdown thẩm mỹ! ✨');
+      setTimeout(() => setAiSuccessMsg(null), 5000);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // Fallback rule-based smart beautifier
+  const handleRuleBasedBeautify = () => {
+    const raw = data.content.trim();
+    if (!raw) return;
+
+    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    let formatted = `# ${data.title || 'Tài Liệu Văn Bản'}\n\n`;
+    if (data.subtitle) {
+      formatted += `*${data.subtitle}*\n\n`;
+    }
+
+    formatted += `> 💡 **Tóm Tắt Cốt Lõi:** Văn bản được biên soạn và chuẩn hóa định dạng theo phong cách ${currentThemeName}.\n\n`;
+
+    lines.forEach((line, idx) => {
+      if (line.startsWith('#') || line.startsWith('>') || line.startsWith('|') || line.startsWith('-')) {
+        formatted += `${line}\n\n`;
+      } else if (idx === 0 && !line.startsWith('#')) {
+        formatted += `## Giới Thiệu Tổng Quan\n\n${line}\n\n`;
+      } else if (idx === Math.floor(lines.length / 2)) {
+        formatted += `## Nội Dung Chi Tiết & Phân Tích\n\n${line}\n\n`;
+      } else {
+        formatted += `${line}\n\n`;
+      }
+    });
+
+    formatted += `\n---\n\n> ❖ **Ghi chú:** Bản quyền nội dung và tài liệu phát hành ngày ${data.date || 'hôm nay'}.`;
+    onChange({ content: formatted.trim() });
   };
 
   return (
@@ -42,14 +127,28 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           <FileEdit className="w-4 h-4 text-indigo-600" />
           <h2 className="text-sm font-bold text-slate-800">Thông tin & Nội dung tài liệu</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1 cursor-pointer"
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          <span>{showAdvanced ? 'Thu gọn tùy chọn' : 'Tùy chọn nâng cao'}</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Cover Page Toggle */}
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors">
+            <input
+              type="checkbox"
+              checked={data.includeCoverPage ?? true}
+              onChange={(e) => onChange({ includeCoverPage: e.target.checked })}
+              className="rounded accent-indigo-600 cursor-pointer w-3.5 h-3.5"
+            />
+            <span className="font-semibold text-slate-700">Kèm trang bìa sang trọng</span>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1 cursor-pointer px-2 py-1"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{showAdvanced ? 'Thu gọn' : 'Tùy chọn'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Metadata Grid */}
@@ -155,62 +254,169 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         </div>
       )}
 
-      {/* Main Text Area */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-semibold text-slate-700">
-            Nội dung văn bản (không giới hạn độ dài) <span className="text-rose-500">*</span>
-          </label>
-
-          {/* Quick Helper Tools */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => insertTextAtCursor('# Tiêu Đề Mục Mới')}
-              className="text-[11px] text-slate-600 hover:text-indigo-600 font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
-              title="Thêm dòng tiêu đề mục"
-            >
-              <Heading className="w-3 h-3" />
-              <span>+ Mục</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-[11px] text-rose-500 hover:text-rose-700 font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
-              title="Xóa trắng nội dung"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span>Xóa</span>
-            </button>
+      {/* AI Beautify Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3.5 rounded-xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-indigo-950">
+              Nhận diện Markdown & Tự Động Định Dạng Thông Minh
+            </h3>
+            <p className="text-[11px] text-indigo-700/80">
+              Chuyển văn bản thô sơ sài thành tài liệu có cấu trúc tầng bậc, đề mục, bảng biểu và hộp tóm tắt
+            </p>
           </div>
         </div>
 
-        <div className="relative">
-          <textarea
-            value={data.content}
-            onChange={(e) => onChange({ content: e.target.value })}
-            placeholder="Dán hoặc gõ văn bản của bạn vào đây (hỗ trợ truyện ngắn, thơ ca, ghi chép, kế hoạch, bài học, báo cáo...)"
-            rows={9}
-            className="w-full p-3.5 border border-slate-200 rounded-xl text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all resize-y font-normal bg-white"
-          />
+        <button
+          type="button"
+          onClick={handleAiBeautify}
+          disabled={isAiLoading}
+          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-sm hover:shadow transition-all cursor-pointer active:scale-95 disabled:opacity-60 whitespace-nowrap shrink-0"
+        >
+          {isAiLoading ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Đang cấu trúc lại...</span>
+            </>
+          ) : (
+            <>
+              <Wand2 className="w-3.5 h-3.5" />
+              <span>✨ AI Làm Đẹp & Cấu Trúc</span>
+            </>
+          )}
+        </button>
+      </div>
 
-          {/* Bottom status bar in textarea */}
-          <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-x border-b border-slate-200 rounded-b-xl -mt-2 text-[11px] text-slate-500">
-            <div className="flex items-center gap-3">
-              <span>
-                <strong className="text-slate-700">{lineCount}</strong> đoạn
-              </span>
-              <span>•</span>
-              <span>
-                <strong className="text-slate-700">{wordCount}</strong> từ
-              </span>
-              <span>•</span>
-              <span>
-                <strong className="text-slate-700">{data.content.length}</strong> ký tự
-              </span>
-            </div>
-            <span className="text-slate-400 italic">Tự động đồng bộ sang 4 định dạng</span>
+      {aiSuccessMsg && (
+        <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{aiSuccessMsg}</span>
+        </div>
+      )}
+
+      {/* Main Text Area & Quick Formatting Bar */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-semibold text-slate-700">
+            Nội dung Markdown (Hỗ trợ # đề mục, **đậm**, *nghiêng*, &gt; trích dẫn, bảng biểu |)
+          </label>
+
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[11px] text-rose-500 hover:text-rose-700 font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+            title="Xóa trắng nội dung"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>Xóa trắng</span>
+          </button>
+        </div>
+
+        {/* Quick Markdown Toolbar */}
+        <div className="flex items-center flex-wrap gap-1.5 p-2 bg-slate-100/90 border border-slate-200 rounded-t-xl text-xs">
+          <button
+            type="button"
+            onClick={() => insertText('# Tiêu Đề Chương 1')}
+            className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer"
+            title="Thêm Đề mục Lớn (#)"
+          >
+            # H1
+          </button>
+          <button
+            type="button"
+            onClick={() => insertText('## 1.1 Tiểu Mục Chi Tiết')}
+            className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer"
+            title="Thêm Tiểu mục (##)"
+          >
+            ## H2
+          </button>
+          <button
+            type="button"
+            onClick={() => insertText('### 1.1.1 Mục Nhỏ')}
+            className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer"
+            title="Thêm Mục nhỏ (###)"
+          >
+            ### H3
+          </button>
+          <span className="text-slate-300">|</span>
+          <button
+            type="button"
+            onClick={() => insertText('> 💡 **Lưu ý cốt lõi:** Nội dung cần ghi nhớ đặc biệt.')}
+            className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-medium text-slate-700 hover:text-amber-600 transition-colors cursor-pointer"
+            title="Thêm Khối Callout Trích dẫn"
+          >
+            <Quote className="w-3 h-3 text-amber-500" />
+            <span>Callout</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              insertText(
+                '| Tiêu Chí | Nội Dung | Đánh Giá |\n| :--- | :--- | :---: |\n| Tốc độ | Cực nhanh | 9.8/10 |\n| Định dạng | Chuẩn xuất bản | 10/10 |'
+              )
+            }
+            className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-medium text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
+            title="Thêm Bảng Markdown"
+          >
+            <Table className="w-3 h-3 text-blue-500" />
+            <span>Bảng biểu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => insertText('- Ý thứ nhất\n- Ý thứ hai\n- Ý thứ ba')}
+            className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-medium text-slate-700 hover:text-emerald-600 transition-colors cursor-pointer"
+            title="Thêm Danh sách Gạch đầu dòng"
+          >
+            <ListPlus className="w-3 h-3 text-emerald-500" />
+            <span>Danh sách</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => insertText('**Nội dung in đậm**')}
+            className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-bold text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
+            title="In đậm từ khóa"
+          >
+            <Bold className="w-3 h-3" />
+            <span>Đậm</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => insertText('---\n')}
+            className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded font-medium text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Đường phân cách"
+          >
+            ───
+          </button>
+        </div>
+
+        {/* Text Area */}
+        <textarea
+          value={data.content}
+          onChange={(e) => onChange({ content: e.target.value })}
+          placeholder="Dán văn bản thô hoặc Markdown vào đây. Nhấn '✨ AI Làm Đẹp & Cấu Trúc' để hệ thống tự động nhận diện và biến hóa thành tài liệu chuẩn chỉnh..."
+          rows={11}
+          className="w-full p-3.5 border-x border-b border-slate-200 rounded-b-xl text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all resize-y font-mono bg-white"
+        />
+
+        {/* Bottom status bar in textarea */}
+        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-x border-b border-slate-200 rounded-b-xl -mt-2 text-[11px] text-slate-500">
+          <div className="flex items-center gap-3">
+            <span>
+              <strong className="text-slate-700">{lineCount}</strong> dòng
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-slate-700">{wordCount}</strong> từ
+            </span>
+            <span>•</span>
+            <span>
+              <strong className="text-slate-700">{data.content.length}</strong> ký tự
+            </span>
           </div>
+          <span className="text-slate-400 italic">Được tối ưu chuẩn cho Microsoft Word & PDF</span>
         </div>
       </div>
     </div>
