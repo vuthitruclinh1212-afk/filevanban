@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
+import { Packer } from 'docx';
 import pptxgen from 'pptxgenjs';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
@@ -7,14 +7,21 @@ import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { DocumentData, DocumentTheme } from '../types';
 import { convertMarkdownToDocx } from './markdownToDocx';
+import {
+  normalizeAndCleanMarkdown,
+  stripMarkdown,
+  parsePptxSlideContent,
+} from './markdownParser';
 
 // Helper to sanitize file names
 export function sanitizeFilename(name: string): string {
-  return name
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, '_')
-    .substring(0, 60) || 'Tai_lieu';
+  return (
+    name
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '_')
+      .substring(0, 60) || 'Tai_lieu'
+  );
 }
 
 // Split content into slide chunks
@@ -23,7 +30,12 @@ export function chunkContentForSlides(
   chunkMode: 'charLimit' | 'paragraph' | 'heading' = 'charLimit',
   maxChars: number = 400
 ): string[] {
-  const rawParagraphs = content.split('\n').map((p) => p.trim()).filter((p) => p.length > 0);
+  const normalized = normalizeAndCleanMarkdown(content);
+  const rawParagraphs = normalized
+    .split('\n\n')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
   if (rawParagraphs.length === 0) return ['Nội dung tài liệu'];
 
   if (chunkMode === 'paragraph') {
@@ -34,7 +46,7 @@ export function chunkContentForSlides(
     const chunks: string[] = [];
     let currentChunk = '';
     rawParagraphs.forEach((p) => {
-      const isHeading = p.startsWith('#') || /^[0-9]+[.)]/.test(p);
+      const isHeading = p.startsWith('#') || /^(Chương|Phần|Mục)\s+[0-9IVXLCDM]+/i.test(p);
       if (isHeading && currentChunk) {
         chunks.push(currentChunk.trim());
         currentChunk = p;
@@ -51,13 +63,13 @@ export function chunkContentForSlides(
   let currentChunk = '';
   rawParagraphs.forEach((p) => {
     if ((currentChunk + '\n\n' + p).length > maxChars) {
-      if (currentChunk) chunks.push(currentChunk);
+      if (currentChunk) chunks.push(currentChunk.trim());
       currentChunk = p;
     } else {
       currentChunk += (currentChunk ? '\n\n' : '') + p;
     }
   });
-  if (currentChunk) chunks.push(currentChunk);
+  if (currentChunk) chunks.push(currentChunk.trim());
 
   return chunks.length > 0 ? chunks : ['Nội dung tài liệu'];
 }
@@ -68,7 +80,7 @@ export async function exportWord(
   theme: DocumentTheme,
   returnBlobOnly = false
 ): Promise<Blob> {
-  const doc = convertMarkdownToDocx(docData, theme, docData.includeCoverPage ?? true);
+  const doc = convertMarkdownToDocx(docData, theme);
   const blob = await Packer.toBlob(doc);
   if (!returnBlobOnly) {
     const filename = `${sanitizeFilename(docData.title)}_${theme.name}.docx`;
@@ -77,7 +89,7 @@ export async function exportWord(
   return blob;
 }
 
-// 2. EXPORT POWERPOINT (.pptx)
+// 2. EXPORT POWERPOINT (.pptx) - Clean, parsed typography without raw markdown
 export async function exportPowerPoint(
   docData: DocumentData,
   theme: DocumentTheme,
@@ -86,128 +98,266 @@ export async function exportPowerPoint(
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
 
-  // Title Slide
-  const titleSlide = pptx.addSlide();
-  titleSlide.background = { color: theme.bgHex };
+  const titleFont = theme.category === 'classic' ? 'Georgia' : 'Arial';
+  const bodyFont = 'Arial';
 
-  // Decorative border
-  titleSlide.addShape('rect', {
-    x: 0.5,
-    y: 0.5,
-    w: 12.33,
-    h: 6.5,
-    line: { color: theme.primaryHex, width: 2 },
-    fill: { color: theme.cardBgHex, transparency: 40 },
-  });
+  // ===================== TITLE SLIDE (Only if includeCoverPage === true) =====================
+  if (docData.includeCoverPage) {
+    const titleSlide = pptx.addSlide();
+    titleSlide.background = { color: theme.bgHex };
 
-  // Title
-  titleSlide.addText(docData.title || 'Tài Liệu Thuyết Trình', {
-    x: 1.0,
-    y: 2.0,
-    w: 11.33,
-    h: 1.6,
-    fontSize: 34,
-    bold: true,
-    color: theme.primaryHex,
-    align: 'center',
-    fontFace: theme.id === 'fairytale' || theme.id === 'cophong' ? 'Georgia' : 'Arial',
-  });
+    // Decorative theme border card
+    titleSlide.addShape('rect', {
+      x: 0.6,
+      y: 0.5,
+      w: 12.13,
+      h: 6.5,
+      line: { color: theme.primaryHex, width: 2 },
+      fill: { color: theme.cardBgHex, transparency: 20 },
+    });
 
-  // Subtitle
-  if (docData.subtitle) {
-    titleSlide.addText(docData.subtitle, {
-      x: 1.2,
-      y: 3.6,
-      w: 10.93,
-      h: 0.8,
-      fontSize: 18,
-      italic: true,
-      color: theme.secondaryHex || theme.accentHex,
+    // Theme Motif Icons
+    titleSlide.addText(theme.cover.icons, {
+      x: 1.0,
+      y: 1.0,
+      w: 11.33,
+      h: 0.6,
+      fontSize: 22,
+      color: theme.primaryHex,
       align: 'center',
-      fontFace: 'Arial',
+    });
+
+    // Theme Badge
+    titleSlide.addText(theme.cover.badge, {
+      x: 1.0,
+      y: 1.7,
+      w: 11.33,
+      h: 0.5,
+      fontSize: 13,
+      bold: true,
+      color: theme.slideAccentHex,
+      align: 'center',
+      fontFace: titleFont,
+    });
+
+    // Document Title
+    titleSlide.addText(docData.title || 'Tài Liệu Thuyết Trình', {
+      x: 1.0,
+      y: 2.3,
+      w: 11.33,
+      h: 1.5,
+      fontSize: 32,
+      bold: true,
+      color: theme.primaryHex,
+      align: 'center',
+      fontFace: titleFont,
+    });
+
+    // Subtitle
+    if (docData.subtitle) {
+      titleSlide.addText(docData.subtitle, {
+        x: 1.2,
+        y: 3.8,
+        w: 10.93,
+        h: 0.7,
+        fontSize: 16,
+        italic: true,
+        color: theme.slideAccentHex,
+        align: 'center',
+        fontFace: bodyFont,
+      });
+    }
+
+    // Theme Quote
+    if (theme.cover.quote) {
+      titleSlide.addText(`“${theme.cover.quote}”`, {
+        x: 1.5,
+        y: 4.6,
+        w: 10.33,
+        h: 0.6,
+        fontSize: 12,
+        italic: true,
+        color: theme.slideTextHex,
+        align: 'center',
+        fontFace: titleFont,
+      });
+    }
+
+    // Meta details footer on title slide
+    const metaDetails = [
+      docData.author ? `Tác giả: ${docData.author}` : '',
+      docData.organization ? `Đơn vị: ${docData.organization}` : '',
+      docData.date ? `Ngày: ${docData.date}` : '',
+      `Ấn bản: ${theme.name}`,
+    ]
+      .filter(Boolean)
+      .join('  •  ');
+
+    titleSlide.addText(metaDetails, {
+      x: 1.0,
+      y: 5.6,
+      w: 11.33,
+      h: 0.5,
+      fontSize: 12,
+      color: theme.slideTextHex,
+      align: 'center',
+      fontFace: bodyFont,
     });
   }
 
-  // Meta info on title slide
-  const metaText = [
-    docData.author ? `Tác giả: ${docData.author}` : '',
-    docData.organization ? `Đơn vị: ${docData.organization}` : '',
-    docData.date ? `Ngày: ${docData.date}` : '',
-    `Phong cách: ${theme.name}`,
-  ]
-    .filter(Boolean)
-    .join('  |  ');
-
-  titleSlide.addText(metaText, {
-    x: 1.0,
-    y: 5.2,
-    w: 11.33,
-    h: 0.6,
-    fontSize: 13,
-    color: theme.textHex,
-    align: 'center',
-    fontFace: 'Arial',
-  });
-
-  // Content Slides
+  // ===================== CONTENT SLIDES =====================
   const chunks = chunkContentForSlides(
     docData.content,
     docData.chunkMode,
     docData.maxCharsPerSlide || 400
   );
 
+  const totalContentSlides = chunks.length;
+
   chunks.forEach((chunk, index) => {
     const slide = pptx.addSlide();
     slide.background = { color: theme.bgHex };
 
-    // Outer decorative card
+    // Card frame
     slide.addShape('roundRect', {
       x: 0.6,
       y: 0.5,
       w: 12.13,
       h: 6.5,
-      rectRadius: 0.15,
+      rectRadius: 0.12,
       line: { color: theme.borderHex || theme.primaryHex, width: 1.5 },
-      fill: { color: theme.cardBgHex, transparency: 30 },
+      fill: { color: theme.cardBgHex, transparency: 15 },
     });
 
-    // Slide Header Tag
-    slide.addText(`${docData.title} • Phần ${index + 1}/${chunks.length}`, {
-      x: 1.0,
-      y: 0.75,
-      w: 10.0,
-      h: 0.45,
-      fontSize: 13,
-      bold: true,
-      color: theme.primaryHex,
-      fontFace: 'Arial',
+    // Running Header (if enabled)
+    if (docData.includeHeaderFooter) {
+      const headerText = docData.customHeaderText?.trim() || docData.title || 'Tài Liệu Thuyết Trình';
+      slide.addText(`${headerText}  •  Phần ${index + 1}/${totalContentSlides}`, {
+        x: 1.0,
+        y: 0.7,
+        w: 11.33,
+        h: 0.45,
+        fontSize: 12,
+        bold: true,
+        color: theme.primaryHex,
+        fontFace: bodyFont,
+      });
+    }
+
+    // Parse slide items to avoid raw markdown
+    const parsedItems = parsePptxSlideContent(chunk, theme);
+
+    let currentY = 1.35;
+    const maxY = 6.2;
+
+    parsedItems.forEach((item) => {
+      if (currentY >= maxY) return;
+
+      if (item.type === 'heading') {
+        const hText = item.runs.map((r) => r.text).join(' ');
+        const hSize = item.level === 1 ? 22 : item.level === 2 ? 18 : 16;
+        slide.addText(hText, {
+          x: 1.0,
+          y: currentY,
+          w: 11.33,
+          h: 0.6,
+          fontSize: hSize,
+          bold: true,
+          color: item.level === 1 ? theme.primaryHex : theme.slideAccentHex,
+          fontFace: titleFont,
+        });
+        currentY += 0.65;
+      } else if (item.type === 'callout') {
+        // Draw callout box
+        const calloutText = item.runs.map((r) => r.text).join(' ');
+        slide.addShape('roundRect', {
+          x: 1.0,
+          y: currentY,
+          w: 11.33,
+          h: 0.9,
+          rectRadius: 0.08,
+          line: { color: theme.primaryHex, width: 2 },
+          fill: { color: theme.bgHex, transparency: 40 },
+        });
+        slide.addText(calloutText, {
+          x: 1.2,
+          y: currentY + 0.1,
+          w: 10.93,
+          h: 0.7,
+          fontSize: 14,
+          italic: true,
+          color: theme.slideTextHex,
+          fontFace: bodyFont,
+        });
+        currentY += 1.05;
+      } else if (item.type === 'bullet') {
+        const textRuns = item.runs.map((r) => ({
+          text: r.text,
+          options: {
+            bold: r.options?.bold,
+            italic: r.options?.italic,
+            color: r.options?.color || theme.slideTextHex,
+            fontSize: 15,
+            fontFace: bodyFont,
+          },
+        }));
+
+        slide.addText(textRuns, {
+          x: 1.2,
+          y: currentY,
+          w: 11.13,
+          h: 0.45,
+          bullet: { type: 'bullet', code: '2022' },
+          color: theme.slideTextHex,
+          fontFace: bodyFont,
+        });
+        currentY += 0.45;
+      } else {
+        // Normal paragraph
+        const textRuns = item.runs.map((r) => ({
+          text: r.text,
+          options: {
+            bold: r.options?.bold,
+            italic: r.options?.italic,
+            color: r.options?.color || theme.slideTextHex,
+            fontSize: 15,
+            fontFace: bodyFont,
+          },
+        }));
+
+        slide.addText(textRuns, {
+          x: 1.0,
+          y: currentY,
+          w: 11.33,
+          h: 0.55,
+          fontFace: bodyFont,
+          lineSpacing: 22,
+        });
+        currentY += 0.6;
+      }
     });
 
-    // Slide Body Text
-    slide.addText(chunk, {
-      x: 1.0,
-      y: 1.45,
-      w: 11.33,
-      h: 4.8,
-      fontSize: 17,
-      color: theme.textHex,
-      lineSpacing: 26,
-      align: 'left',
-      valign: 'top',
-      fontFace: theme.id === 'fairytale' || theme.id === 'cophong' ? 'Georgia' : 'Arial',
-    });
+    // Running Footer & Page Numbering
+    if (docData.includeHeaderFooter || docData.includePageNumber) {
+      const footerParts: string[] = [];
+      if (docData.includeHeaderFooter) {
+        footerParts.push(docData.customFooterText?.trim() || `${theme.name} Edition`);
+      }
+      if (docData.includePageNumber) {
+        footerParts.push(`Trang ${index + 1} / ${totalContentSlides}`);
+      }
 
-    // Slide Footer
-    slide.addText(`Chủ đề: ${theme.name}  —  Trang ${index + 2}`, {
-      x: 1.0,
-      y: 6.4,
-      w: 11.33,
-      h: 0.35,
-      fontSize: 10,
-      color: theme.accentHex,
-      align: 'right',
-      fontFace: 'Arial',
-    });
+      slide.addText(footerParts.join('  •  '), {
+        x: 1.0,
+        y: 6.4,
+        w: 11.33,
+        h: 0.35,
+        fontSize: 11,
+        color: theme.slideAccentHex,
+        align: 'right',
+        fontFace: bodyFont,
+      });
+    }
   });
 
   const blob = (await pptx.write({ outputType: 'blob' })) as Blob;
@@ -218,7 +368,7 @@ export async function exportPowerPoint(
   return blob;
 }
 
-// 3. EXPORT EXCEL WORKBOOK (.xlsx)
+// 3. EXPORT EXCEL WORKBOOK (.xlsx) - Completely stripped of raw markdown
 export async function exportExcel(
   docData: DocumentData,
   theme: DocumentTheme,
@@ -228,46 +378,75 @@ export async function exportExcel(
   workbook.creator = docData.author || 'Trình Định Dạng Tài Liệu';
   workbook.created = new Date();
 
-  // Sheet 1: Nội dung chi tiết
-  const sheet = workbook.addWorksheet(theme.name, {
+  // ===================== SHEET 1: TRANG BÌA (If includeCoverPage === true) =====================
+  if (docData.includeCoverPage) {
+    const coverSheet = workbook.addWorksheet('Trang Bìa', {
+      views: [{ showGridLines: true }],
+    });
+
+    coverSheet.mergeCells('B2:F2');
+    const badgeCell = coverSheet.getCell('B2');
+    badgeCell.value = theme.cover.badge;
+    badgeCell.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF' + theme.primaryHex } };
+    badgeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    coverSheet.getRow(2).height = 24;
+
+    coverSheet.mergeCells('B3:F4');
+    const titleCell = coverSheet.getCell('B3');
+    titleCell.value = (docData.title || 'TÀI LIỆU VĂN BẢN').toUpperCase();
+    titleCell.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF' + theme.primaryHex } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + theme.bgHex } };
+
+    if (docData.subtitle) {
+      coverSheet.mergeCells('B5:F5');
+      const subCell = coverSheet.getCell('B5');
+      subCell.value = docData.subtitle;
+      subCell.font = { name: 'Segoe UI', size: 12, italic: true, color: { argb: 'FF' + theme.paperAccentHex } };
+      subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      coverSheet.getRow(5).height = 22;
+    }
+
+    // Metadata Table on Cover Sheet
+    const metaInfo = [
+      ['Biểu tượng chủ đề', theme.cover.icons],
+      ['Tác giả biên soạn', docData.author || 'Chưa đặt'],
+      ['Đơn vị thực hiện', docData.organization || 'Hệ thống Quản trị Tài liệu'],
+      ['Ngày phát hành', docData.date || new Date().toLocaleDateString('vi-VN')],
+      ['Phong cách thẩm mỹ', `${theme.name} (${theme.subtitle})`],
+      ['Châm ngôn chủ đề', `“${theme.cover.quote}”`],
+    ];
+
+    metaInfo.forEach(([label, val], idx) => {
+      const r = 7 + idx;
+      coverSheet.getCell(`B${r}`).value = label;
+      coverSheet.getCell(`B${r}`).font = { name: 'Segoe UI', bold: true, color: { argb: 'FF475569' } };
+      coverSheet.getCell(`B${r}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+      coverSheet.mergeCells(`C${r}:F${r}`);
+      coverSheet.getCell(`C${r}`).value = val;
+      coverSheet.getCell(`C${r}`).font = { name: 'Segoe UI', color: { argb: 'FF0F172A' } };
+      coverSheet.getRow(r).height = 24;
+    });
+
+    coverSheet.getColumn('B').width = 24;
+    coverSheet.getColumn('C').width = 25;
+    coverSheet.getColumn('D').width = 25;
+    coverSheet.getColumn('E').width = 25;
+  }
+
+  // ===================== SHEET 2: DỮ LIỆU CHI TIẾT =====================
+  const dataSheet = workbook.addWorksheet('Dữ Liệu Chi Tiết', {
     views: [{ showGridLines: true }],
   });
 
-  // Title Banner
-  sheet.mergeCells('B2:F2');
-  const titleCell = sheet.getCell('B2');
-  titleCell.value = (docData.title || 'Tài Liệu Dữ Liệu').toUpperCase();
-  titleCell.font = {
-    name: 'Segoe UI',
-    size: 16,
-    bold: true,
-    color: { argb: 'FF' + theme.primaryHex },
-  };
-  titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
-  titleCell.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF' + theme.bgHex },
-  };
-  sheet.getRow(2).height = 36;
-
-  // Metadata Sub-banner
-  sheet.mergeCells('B3:F3');
-  const metaCell = sheet.getCell('B3');
-  metaCell.value = `Chủ đề: ${theme.name}  |  Tác giả: ${docData.author || 'Không ghi'}  |  Ngày tạo: ${
-    docData.date || new Date().toLocaleDateString('vi-VN')
-  }`;
-  metaCell.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF64748B' } };
-  metaCell.alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getRow(3).height = 20;
-
   // Table Headers
-  const headerRow = sheet.getRow(5);
-  headerRow.values = ['', 'STT', 'Tiêu đề / Đoạn', 'Nội dung chi tiết', '', 'Số ký tự'];
-  sheet.mergeCells('D5:E5');
+  const headerRow = dataSheet.getRow(2);
+  headerRow.values = ['', 'STT', 'Phân Loại', 'Nội Dung Chi Tiết (Đã Lọc Markdown)', '', 'Ký Tự'];
+  dataSheet.mergeCells('D2:E2');
 
-  ['B5', 'C5', 'D5', 'F5'].forEach((cellAddr) => {
-    const c = sheet.getCell(cellAddr);
+  ['B2', 'C2', 'D2', 'F2'].forEach((cellAddr) => {
+    const c = dataSheet.getCell(cellAddr);
     c.fill = {
       type: 'pattern',
       pattern: 'solid',
@@ -281,32 +460,37 @@ export async function exportExcel(
     };
     c.alignment = { vertical: 'middle', horizontal: 'center' };
   });
-  headerRow.height = 28;
+  headerRow.height = 30;
 
-  // Content Rows
-  const paragraphs = docData.content
+  // Split content and clean markdown
+  const normalized = normalizeAndCleanMarkdown(docData.content);
+  const rawParagraphs = normalized
     .split('\n')
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
 
-  paragraphs.forEach((p, index) => {
-    const rowIdx = 6 + index;
-    const row = sheet.getRow(rowIdx);
-    sheet.mergeCells(`D${rowIdx}:E${rowIdx}`);
+  rawParagraphs.forEach((rawLine, index) => {
+    const rowIdx = 3 + index;
+    const row = dataSheet.getRow(rowIdx);
+    dataSheet.mergeCells(`D${rowIdx}:E${rowIdx}`);
 
-    const isHeading = p.startsWith('#') || /^[0-9]+[.)]/.test(p);
+    const isHeading = rawLine.startsWith('#') || /^(Chương|Phần|Mục)\s+[0-9IVXLCDM]+/i.test(rawLine);
+    const cleanContent = stripMarkdown(rawLine);
 
-    const cellSTT = sheet.getCell(`B${rowIdx}`);
+    // STT
+    const cellSTT = dataSheet.getCell(`B${rowIdx}`);
     cellSTT.value = index + 1;
     cellSTT.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    const cellSection = sheet.getCell(`C${rowIdx}`);
-    cellSection.value = isHeading ? 'Mục / Đầu mục' : `Đoạn ${index + 1}`;
-    cellSection.alignment = { horizontal: 'center', vertical: 'middle' };
-    cellSection.font = { bold: isHeading, size: 10 };
+    // Section Type
+    const cellType = dataSheet.getCell(`C${rowIdx}`);
+    cellType.value = isHeading ? 'Đầu Mục #' : rawLine.startsWith('- ') ? 'Gạch Đầu Dòng' : `Đoạn ${index + 1}`;
+    cellType.alignment = { horizontal: 'center', vertical: 'middle' };
+    cellType.font = { bold: isHeading, size: 10 };
 
-    const cellContent = sheet.getCell(`D${rowIdx}`);
-    cellContent.value = p;
+    // Clean Content
+    const cellContent = dataSheet.getCell(`D${rowIdx}`);
+    cellContent.value = cleanContent;
     cellContent.alignment = { wrapText: true, vertical: 'middle' };
     cellContent.font = {
       name: 'Segoe UI',
@@ -315,12 +499,13 @@ export async function exportExcel(
       color: { argb: isHeading ? 'FF' + theme.primaryHex : 'FF1E293B' },
     };
 
-    const cellCount = sheet.getCell(`F${rowIdx}`);
-    cellCount.value = p.length;
+    // Character Count
+    const cellCount = dataSheet.getCell(`F${rowIdx}`);
+    cellCount.value = cleanContent.length;
     cellCount.alignment = { horizontal: 'center', vertical: 'middle' };
     cellCount.font = { size: 10, color: { argb: 'FF64748B' } };
 
-    // Row styling: zebra stripes
+    // Zebra striping
     if (index % 2 === 1) {
       const stripeFill: ExcelJS.Fill = {
         type: 'pattern',
@@ -328,64 +513,19 @@ export async function exportExcel(
         fgColor: { argb: 'FFF8FAFC' },
       };
       cellSTT.fill = stripeFill;
-      cellSection.fill = stripeFill;
+      cellType.fill = stripeFill;
       cellContent.fill = stripeFill;
       cellCount.fill = stripeFill;
     }
 
-    row.height = Math.max(26, Math.ceil(p.length / 55) * 18);
+    row.height = Math.max(26, Math.ceil(cleanContent.length / 55) * 18);
   });
 
-  sheet.getColumn('B').width = 8;
-  sheet.getColumn('C').width = 16;
-  sheet.getColumn('D').width = 45;
-  sheet.getColumn('E').width = 45;
-  sheet.getColumn('F').width = 14;
-
-  // Sheet 2: Thống kê & Tổng quan
-  const summarySheet = workbook.addWorksheet('Tổng Quan');
-  summarySheet.mergeCells('B2:E2');
-  const sumTitle = summarySheet.getCell('B2');
-  sumTitle.value = 'THỐNG KÊ TỔNG QUAN TÀI LIỆU';
-  sumTitle.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF' + theme.primaryHex } };
-  sumTitle.alignment = { horizontal: 'center', vertical: 'middle' };
-  sumTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + theme.bgHex } };
-  summarySheet.getRow(2).height = 32;
-
-  const stats = [
-    ['Tiêu đề tài liệu', docData.title],
-    ['Phụ đề', docData.subtitle || 'Không có'],
-    ['Tác giả', docData.author || 'Chưa đặt'],
-    ['Đơn vị thực hiện', docData.organization || 'Chưa đặt'],
-    ['Chủ đề thẩm mỹ', theme.name],
-    ['Mã màu chính (Primary)', `#${theme.primaryHex}`],
-    ['Mã màu nền (Background)', `#${theme.bgHex}`],
-    ['Tổng số đoạn văn', paragraphs.length],
-    ['Tổng số từ ước tính', docData.content.trim().split(/\s+/).length],
-    ['Tổng số ký tự', docData.content.length],
-    ['Ngày xuất bản', docData.date || new Date().toLocaleDateString('vi-VN')],
-  ];
-
-  stats.forEach((item, idx) => {
-    const rowIdx = 4 + idx;
-    const keyCell = summarySheet.getCell(`B${rowIdx}`);
-    const valCell = summarySheet.getCell(`C${rowIdx}`);
-    summarySheet.mergeCells(`C${rowIdx}:E${rowIdx}`);
-
-    keyCell.value = item[0];
-    keyCell.font = { bold: true, color: { argb: 'FF334155' } };
-    keyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-
-    valCell.value = String(item[1]);
-    valCell.font = { color: { argb: 'FF0F172A' } };
-
-    summarySheet.getRow(rowIdx).height = 24;
-  });
-
-  summarySheet.getColumn('B').width = 24;
-  summarySheet.getColumn('C').width = 25;
-  summarySheet.getColumn('D').width = 25;
-  summarySheet.getColumn('E').width = 25;
+  dataSheet.getColumn('B').width = 8;
+  dataSheet.getColumn('C').width = 16;
+  dataSheet.getColumn('D').width = 45;
+  dataSheet.getColumn('E').width = 45;
+  dataSheet.getColumn('F').width = 14;
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -399,16 +539,21 @@ export async function exportExcel(
   return blob;
 }
 
-// 4. EXPORT PDF (.pdf) WITH HIGH ACCURACY
+// 4. EXPORT PDF (.pdf) - High Accuracy & zero character errors
 export async function exportPDF(
   docData: DocumentData,
   theme: DocumentTheme,
   previewElement?: HTMLElement | null,
   returnBlobOnly = false
 ): Promise<Blob> {
-  // If an element is provided, we can render via html2canvas to ensure 100% faithful Vietnamese font rendering & borders
-  if (previewElement) {
-    const canvas = await html2canvas(previewElement, {
+  // Locate print container if previewElement is not directly passed
+  const targetElement =
+    previewElement ||
+    document.getElementById('pdf-render-target') ||
+    document.querySelector('.pdf-preview-container');
+
+  if (targetElement) {
+    const canvas = await html2canvas(targetElement as HTMLElement, {
       scale: 2,
       useCORS: true,
       backgroundColor: `#${theme.bgHex}`,
@@ -448,39 +593,32 @@ export async function exportPDF(
     return blob;
   }
 
-  // Fallback direct jsPDF generation
+  // Fallback high-contrast vector PDF with sanitized Vietnamese text
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 50;
   const maxLineWidth = pageWidth - margin * 2;
 
-  // Background
   doc.setFillColor(theme.rgb.bg[0], theme.rgb.bg[1], theme.rgb.bg[2]);
   doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-  // Decorative border
   doc.setDrawColor(theme.rgb.primary[0], theme.rgb.primary[1], theme.rgb.primary[2]);
   doc.setLineWidth(1.5);
   doc.rect(25, 25, pageWidth - 50, pageHeight - 50);
 
-  // Title
   doc.setTextColor(theme.rgb.primary[0], theme.rgb.primary[1], theme.rgb.primary[2]);
   doc.setFontSize(22);
-  doc.text(docData.title || 'Tai Lieu', margin, 70);
+  doc.text(stripMarkdown(docData.title || 'Tai Lieu'), margin, 70);
 
-  // Subtitle
   if (docData.subtitle) {
     doc.setTextColor(theme.rgb.accent[0], theme.rgb.accent[1], theme.rgb.accent[2]);
     doc.setFontSize(13);
-    doc.text(docData.subtitle, margin, 92);
+    doc.text(stripMarkdown(docData.subtitle), margin, 92);
   }
 
-  // Body Content
-  doc.setTextColor(theme.rgb.text[0], theme.rgb.text[1], theme.rgb.text[2]);
-  doc.setFontSize(11);
-
-  const lines = doc.splitTextToSize(docData.content, maxLineWidth);
+  const cleanBody = stripMarkdown(docData.content);
+  const lines = doc.splitTextToSize(cleanBody, maxLineWidth);
   let y = docData.subtitle ? 120 : 100;
 
   for (let i = 0; i < lines.length; i++) {

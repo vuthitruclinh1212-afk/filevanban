@@ -1,3 +1,12 @@
+export interface ThemeCoverConfig {
+  badge: string;
+  icons: string;
+  motif: string;
+  quote: string;
+  sealText?: string;
+  borderStyle: 'ornate' | 'classical' | 'modern' | 'minimal' | 'cyber' | 'playful';
+}
+
 export interface DocumentTheme {
   id: string;
   name: string;
@@ -9,6 +18,11 @@ export interface DocumentTheme {
   secondaryHex: string;
   cardBgHex: string;
   borderHex: string;
+  // High-contrast specific fields for paper and slide readability
+  paperTextHex: string;
+  paperAccentHex: string;
+  slideTextHex: string;
+  slideAccentHex: string;
   rgb: {
     bg: [number, number, number];
     primary: [number, number, number];
@@ -21,6 +35,8 @@ export interface DocumentTheme {
   fontClassBody: string;
   icon: string;
   styleDescription: string;
+  category?: 'classic' | 'modern' | 'creative';
+  cover: ThemeCoverConfig;
 }
 
 export interface DocumentData {
@@ -33,7 +49,11 @@ export interface DocumentData {
   watermark?: string;
   chunkMode: 'charLimit' | 'paragraph' | 'heading';
   maxCharsPerSlide: number;
-  includeCoverPage?: boolean;
+  includeCoverPage: boolean;
+  includeHeaderFooter: boolean;
+  includePageNumber: boolean;
+  customHeaderText?: string;
+  customFooterText?: string;
 }
 
 export type ExportFormat = 'docx' | 'pptx' | 'pdf' | 'xlsx' | 'zip';

@@ -92,9 +92,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Nội dung mẫu</span>
               </button>
-              <div className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 hidden group-hover:block z-50">
-                <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Chọn mẫu thử nhanh
+              <div className="absolute right-0 mt-1 w-72 max-h-[380px] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 hidden group-hover:block z-50 divide-y divide-slate-100">
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider sticky top-0 bg-white">
+                  Chọn mẫu bài viết thử nghiệm ({SAMPLE_CONTENTS.length})
                 </div>
                 {SAMPLE_CONTENTS.map((sample) => (
                   <button

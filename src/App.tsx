@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import { marked } from 'marked';
 import { Navbar } from './components/Navbar';
 import { ThemeSelector } from './components/ThemeSelector';
 import { DocumentEditor } from './components/DocumentEditor';
@@ -14,6 +15,7 @@ import { SAMPLE_CONTENTS } from './data/sampleContent';
 import { DocumentData } from './types';
 import { exportAllFormats } from './services/documentExport';
 import { chunkContentForSlides } from './services/documentExport';
+import { normalizeAndCleanMarkdown } from './services/markdownParser';
 
 export default function App() {
   const [selectedThemeId, setSelectedThemeId] = useState<string>('fairytale');
@@ -31,6 +33,11 @@ export default function App() {
     content: initialSample.content,
     chunkMode: 'charLimit',
     maxCharsPerSlide: 400,
+    includeCoverPage: true,
+    includeHeaderFooter: true,
+    includePageNumber: true,
+    customHeaderText: '',
+    customFooterText: '',
   });
 
   const currentTheme = THEMES[selectedThemeId] || THEMES.fairytale;
@@ -41,7 +48,7 @@ export default function App() {
     : 0;
   const charCount = documentData.content.length;
   const slideCount =
-    1 +
+    (documentData.includeCoverPage ? 1 : 0) +
     chunkContentForSlides(
       documentData.content,
       documentData.chunkMode,
@@ -84,6 +91,11 @@ export default function App() {
         content: '',
         chunkMode: 'charLimit',
         maxCharsPerSlide: 400,
+        includeCoverPage: true,
+        includeHeaderFooter: true,
+        includePageNumber: true,
+        customHeaderText: '',
+        customFooterText: '',
       });
     }
   };
@@ -123,6 +135,16 @@ export default function App() {
       setIsExporting(false);
     }
   };
+
+  // Pre-parse markdown for offscreen PDF export target
+  const parsedPdfHtml = React.useMemo(() => {
+    const normalized = normalizeAndCleanMarkdown(documentData.content);
+    try {
+      return marked.parse(normalized, { gfm: true, breaks: true }) as string;
+    } catch (e) {
+      return normalized;
+    }
+  }, [documentData.content]);
 
   return (
     <div className="min-h-screen bg-slate-100/60 flex flex-col font-sans">
@@ -179,26 +201,138 @@ export default function App() {
             {/* Helper Tips Card */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs text-xs text-slate-500 flex flex-col gap-2">
               <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                <span>💡 Mẹo Định Dạng Nhanh:</span>
+                <span>💡 Hướng Dẫn & Tối Ưu Định Dạng:</span>
               </div>
               <ul className="list-disc list-inside space-y-1 text-slate-600">
                 <li>
-                  Bắt đầu một dòng bằng <code># Tiêu đề</code> để tạo đề mục lớn trong Word & ngắt slide mới trong PowerPoint.
+                  <strong>Xử lý dấu sao (*):</strong> Hệ thống tự động làm sạch các dấu sao bao quanh hoặc gạch đầu dòng thành in đậm/in nghiêng/bullet chuẩn chỉnh.
                 </li>
                 <li>
-                  Hệ thống tự động điều chỉnh độ cao dòng và căn đều lề chuẩn văn bản hành chính.
+                  <strong>Trang bìa thẩm mỹ:</strong> Mỗi theme được thiết kế bố cục bìa, huy hiệu, biểu tượng và hoa văn độc bản riêng.
                 </li>
                 <li>
-                  File Excel tự động tích hợp 2 trang tính: Trang dữ liệu chi tiết và Trang thống kê tổng quan.
+                  <strong>Đánh số trang & Header/Footer:</strong> Bật/tắt hoặc nhập nội dung tùy chỉnh theo ý muốn.
                 </li>
                 <li>
-                  Nhấn nút <strong>Xuất trọn bộ (ZIP)</strong> để tải cùng lúc cả 4 định dạng chỉ với 1 lượt bấm.
+                  <strong>Tối ưu đa định dạng:</strong> Không còn sót ký tự Markdown trên PowerPoint, PDF hay Excel.
                 </li>
               </ul>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Off-screen dedicated high-fidelity target for background PDF rendering */}
+      <div
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: '794px',
+          minHeight: '1123px',
+          zIndex: -100,
+        }}
+        aria-hidden="true"
+      >
+        <div
+          id="pdf-render-target"
+          className="p-12 relative overflow-hidden"
+          style={{
+            backgroundColor: `#${currentTheme.bgHex}`,
+            color: `#${currentTheme.slideTextHex}`,
+          }}
+        >
+          {/* Border */}
+          <div
+            className="absolute inset-4 border-2 pointer-events-none"
+            style={{ borderColor: `#${currentTheme.primaryHex}` }}
+          />
+          <div
+            className="absolute inset-5 border border-dashed pointer-events-none opacity-60"
+            style={{ borderColor: `#${currentTheme.primaryHex}` }}
+          />
+
+          <div className="relative z-10">
+            {/* Header */}
+            {documentData.includeHeaderFooter && (
+              <div
+                className="flex items-center justify-between text-xs pb-3 border-b mb-6 font-mono"
+                style={{ borderColor: `#${currentTheme.primaryHex}40` }}
+              >
+                <span style={{ color: `#${currentTheme.primaryHex}` }}>
+                  ★ {documentData.customHeaderText || documentData.title}
+                </span>
+                <span style={{ color: `#${currentTheme.slideAccentHex}` }}>
+                  {currentTheme.name.toUpperCase()}
+                </span>
+              </div>
+            )}
+
+            {/* Cover Motif */}
+            {documentData.includeCoverPage && (
+              <div className="text-center mb-6 pb-4 border-b border-dashed" style={{ borderColor: `#${currentTheme.primaryHex}40` }}>
+                <div className="text-3xl mb-1">{currentTheme.cover.icons}</div>
+                <div
+                  className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2"
+                  style={{ backgroundColor: `#${currentTheme.primaryHex}20`, color: `#${currentTheme.primaryHex}` }}
+                >
+                  {currentTheme.cover.badge}
+                </div>
+              </div>
+            )}
+
+            {/* Title */}
+            <h1
+              className={`text-3xl font-bold text-center tracking-tight mb-2 ${currentTheme.fontClassTitle}`}
+              style={{ color: `#${currentTheme.primaryHex}` }}
+            >
+              {documentData.title || 'Tài Liệu Văn Bản'}
+            </h1>
+
+            {documentData.subtitle && (
+              <p
+                className="text-center italic text-sm mb-4"
+                style={{ color: `#${currentTheme.slideAccentHex}` }}
+              >
+                {documentData.subtitle}
+              </p>
+            )}
+
+            <div
+              className="text-center text-xs mb-6 pb-2"
+              style={{ color: `#${currentTheme.slideTextHex}cc` }}
+            >
+              {documentData.author && <span>Tác giả: {documentData.author} | </span>}
+              {documentData.date && <span>Ngày: {documentData.date} | </span>}
+              <span>Chủ đề: {currentTheme.name}</span>
+            </div>
+
+            {/* Body */}
+            <div
+              className={`markdown-preview ${currentTheme.fontClassBody}`}
+              style={
+                {
+                  '--theme-primary': `#${currentTheme.primaryHex}`,
+                  '--theme-accent': `#${currentTheme.slideAccentHex}`,
+                  color: `#${currentTheme.slideTextHex}`,
+                } as React.CSSProperties
+              }
+              dangerouslySetInnerHTML={{ __html: parsedPdfHtml }}
+            />
+
+            {/* Footer */}
+            {(documentData.includeHeaderFooter || documentData.includePageNumber) && (
+              <div
+                className="mt-10 pt-4 border-t flex items-center justify-between text-xs"
+                style={{ borderColor: `#${currentTheme.primaryHex}40`, color: `#${currentTheme.slideAccentHex}` }}
+              >
+                <span>{documentData.includeHeaderFooter ? (documentData.customFooterText || `${currentTheme.name} Edition`) : ''}</span>
+                {documentData.includePageNumber && <span>Trang 1 / 1</span>}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 mt-12 text-center text-xs text-slate-400">
