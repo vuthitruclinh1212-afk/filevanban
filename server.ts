@@ -89,6 +89,75 @@ ${rawText}`;
   }
 });
 
+// Endpoint: AI Image Generation from Prompt (for ![Image](prompt:...) tags)
+app.post('/api/ai/generate-image', async (req, res) => {
+  try {
+    const { prompt, themeId } = req.body;
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp câu lệnh prompt.' });
+    }
+
+    const cleanPrompt = prompt.trim();
+
+    // Check if we can generate an artistic vector illustration via Gemini
+    try {
+      const aiResponse = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: `Create an elegant, artistic standalone SVG illustration (800x450 viewBox="0 0 800 450") for this concept:
+"${cleanPrompt}"
+Theme ID: ${themeId || 'general'}
+
+REQUIREMENTS:
+- Return ONLY valid raw <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="100%" height="100%">...</svg> code.
+- No markdown code blocks, no introductory text, no HTML wrappers.
+- Use beautiful modern gradients, sleek silhouettes, harmonious colors matching the concept.
+- Highly detailed and aesthetically pleasing.`,
+      });
+
+      const text = aiResponse.text || '';
+      const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
+      if (svgMatch) {
+        const svgCode = svgMatch[0];
+        const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgCode)}`;
+        return res.json({ success: true, imageUrl: dataUrl, prompt: cleanPrompt });
+      }
+    } catch (modelErr: any) {
+      console.warn('Gemini SVG generation fallback to high-contrast graphic:', modelErr?.message);
+    }
+
+    // High-contrast clean generative SVG fallback
+    const encodedPrompt = cleanPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="100%" height="100%">
+  <defs>
+    <linearGradient id="ai-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1B4B"/>
+      <stop offset="50%" stop-color="#312E81"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <radialGradient id="ai-glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#818CF8" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1E1B4B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#ai-grad)"/>
+  <circle cx="400" cy="200" r="220" fill="url(#ai-glow)"/>
+  <rect x="50" y="40" width="700" height="370" rx="16" fill="rgba(15, 23, 42, 0.6)" stroke="#818CF8" stroke-width="2"/>
+  <text x="400" y="90" font-family="sans-serif" font-size="14" font-weight="bold" fill="#818CF8" text-anchor="middle" letter-spacing="2">✦ HÌNH ẢNH MINH HỌA AI NÂNG CAO ✦</text>
+  <circle cx="400" cy="180" r="45" fill="#4338CA" stroke="#818CF8" stroke-width="2"/>
+  <text x="400" y="195" font-family="sans-serif" font-size="40" fill="#FFFFFF" text-anchor="middle">🎨</text>
+  <text x="400" y="270" font-family="sans-serif" font-size="22" font-weight="bold" fill="#FFFFFF" text-anchor="middle">${encodedPrompt.substring(0, 45)}</text>
+  <text x="400" y="300" font-family="sans-serif" font-size="16" fill="#C7D2FE" text-anchor="middle">${encodedPrompt.length > 45 ? encodedPrompt.substring(45, 95) : ''}</text>
+  <text x="400" y="370" font-family="sans-serif" font-size="12" font-style="italic" fill="#A5B4FC" text-anchor="middle">Tự động kết xuất vào tài liệu Word, PowerPoint &amp; PDF</text>
+</svg>`;
+
+    const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
+    res.json({ success: true, imageUrl: dataUrl, prompt: cleanPrompt });
+  } catch (error: any) {
+    console.error('AI image endpoint error:', error);
+    res.status(500).json({ error: 'Không thể tạo hình ảnh: ' + error.message });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static('dist'));

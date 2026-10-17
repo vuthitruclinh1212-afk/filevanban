@@ -264,6 +264,7 @@ function convertTextToHierarchicalHeading(text: string): string | null {
 export function stripMarkdown(text: string): string {
   if (!text) return '';
   return text
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // images -> alt text
     .replace(/^#{1,6}\s+/gm, '') // headings
     .replace(/<[^>]+>/g, '') // remove any HTML tags (<b>, <i>, <br>, etc.)
     .replace(/\*\*\*([^*]+)\*\*\*/g, '$1') // bold italic
@@ -297,11 +298,13 @@ export interface PptxTextRun {
 }
 
 export interface PptxSlideItem {
-  type: 'heading' | 'bullet' | 'paragraph' | 'callout' | 'table';
+  type: 'heading' | 'bullet' | 'paragraph' | 'callout' | 'table' | 'image';
   level?: number;
   runs: PptxTextRun[];
   rawText?: string;
   tableData?: string[][];
+  imageUrl?: string;
+  imageAlt?: string;
 }
 
 /**
@@ -353,6 +356,17 @@ export function parsePptxSlideContent(
         type: 'bullet',
         runs,
       });
+    } else if (/^!\[([^\]]*)\]\((.*?)\)/.test(line)) {
+      // Image line (either resolved data URL or prompt:...)
+      const match = line.match(/^!\[([^\]]*)\]\((.*?)\)/);
+      if (match) {
+        items.push({
+          type: 'image',
+          runs: [],
+          imageAlt: match[1] || 'Hình ảnh minh họa',
+          imageUrl: match[2],
+        });
+      }
     } else if (line.startsWith('|') && line.endsWith('|')) {
       // Table row
       const cells = line
@@ -363,11 +377,16 @@ export function parsePptxSlideContent(
       if (cells.every((c) => /^[-:\s]+$/.test(c))) {
         continue;
       }
-      items.push({
-        type: 'table',
-        runs: [],
-        tableData: [cells],
-      });
+      const lastItem = items[items.length - 1];
+      if (lastItem && lastItem.type === 'table' && lastItem.tableData) {
+        lastItem.tableData.push(cells);
+      } else {
+        items.push({
+          type: 'table',
+          runs: [],
+          tableData: [cells],
+        });
+      }
     } else {
       const runs = parseInlineRunsForPptx(line, theme, { fontSize: 15 });
       items.push({

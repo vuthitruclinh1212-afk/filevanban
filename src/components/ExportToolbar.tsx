@@ -19,6 +19,7 @@ import {
   exportPDF,
   exportAllFormats,
 } from '../services/documentExport';
+import { ExportProgressModal } from './ExportProgressModal';
 
 interface ExportToolbarProps {
   data: DocumentData;
@@ -36,6 +37,7 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
   setIsExporting,
 }) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('docx');
+  const [activeExportFormat, setActiveExportFormat] = useState<ExportFormat>('docx');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -58,6 +60,7 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
       return;
     }
 
+    setActiveExportFormat(formatToExport);
     setIsExporting(true);
     setErrorMessage(null);
 
@@ -65,19 +68,19 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
       switch (formatToExport) {
         case 'docx':
           setStatusMessage('Đang kết xuất Microsoft Word (.docx)...');
-          await exportWord(data, theme);
+          await exportWord(data, theme, false, (msg) => setStatusMessage(msg));
           setStatusMessage('Đã tải xuống file Word thành công! 🎉');
           break;
 
         case 'pptx':
           setStatusMessage('Đang kết xuất PowerPoint (.pptx)...');
-          await exportPowerPoint(data, theme);
+          await exportPowerPoint(data, theme, false, (msg) => setStatusMessage(msg));
           setStatusMessage('Đã tải xuống file PowerPoint thành công! 🎉');
           break;
 
         case 'pdf':
           setStatusMessage('Đang kết xuất tài liệu PDF (.pdf)...');
-          await exportPDF(data, theme, pdfElementRef.current);
+          await exportPDF(data, theme, pdfElementRef.current, false, (msg) => setStatusMessage(msg));
           setStatusMessage('Đã tải xuống file PDF thành công! 🎉');
           break;
 
@@ -230,6 +233,14 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
           <span className="font-medium">{errorMessage}</span>
         </div>
       )}
+
+      {/* Professional Multi-Stage Animated Progress Modal */}
+      <ExportProgressModal
+        isOpen={isExporting}
+        format={activeExportFormat}
+        theme={theme}
+        customStatus={statusMessage}
+      />
     </div>
   );
 };

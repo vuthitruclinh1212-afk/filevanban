@@ -34,6 +34,8 @@ Mỗi khi màn đêm buông xuống, những đóa hoa *Dạ Nguyệt* lại n�
 | **Kiếm Lưu Ly** | Kim | Hiệp Sĩ Bão Tuyết | Chém đứt ảo ảnh |
 | **Đá Nguyện Ước** | Quang | Tinh Linh Trưởng | Hiện thực hóa ước mơ |
 
+![Vương Quốc Ánh Sao](prompt:Enchanting fairytale castle with golden stardust under glowing crescent moon, fantasy storybook digital art)
+
 ## 2. Cuộc Hành Trình Tìm Lại Ánh Sáng
 
 Chàng hiệp sĩ trẻ mang theo trái tim dũng cảm bước chân qua muôn trùng bão tuyết:

@@ -19,6 +19,8 @@ import {
   stripMarkdown,
   parsePptxSlideContent,
 } from '../services/markdownParser';
+import { DocumentCoverView } from './DocumentCoverView';
+import { generateImageFromPrompt } from '../services/aiImageService';
 
 interface DocumentPreviewProps {
   data: DocumentData;
@@ -34,21 +36,43 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   const [activeTab, setActiveTab] = useState<'word' | 'pptx' | 'pdf' | 'xlsx'>('word');
   const [wordViewMode, setWordViewMode] = useState<'content' | 'cover'>('content');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [previewAiImages, setPreviewAiImages] = useState<Record<string, string>>({});
+  const [isGeneratingPreviewImg, setIsGeneratingPreviewImg] = useState<string | null>(null);
+
+  // Check if theme has dark background
+  const isDarkTheme = React.useMemo(() => {
+    return ['fairytale', 'emerald', 'cyberpunk', 'ocean', 'baroque'].includes(theme.id) || theme.rgb.bg[0] < 60;
+  }, [theme]);
 
   // Normalize markdown text and remove raw asterisk glitches
   const normalizedContent = React.useMemo(() => {
     return normalizeAndCleanMarkdown(data.content);
   }, [data.content]);
 
+  // Transform markdown to replace ![alt](prompt:...) with rich HTML preview widget
+  const previewHtmlReadyMarkdown = React.useMemo(() => {
+    return normalizedContent.replace(/!\[([^\]]*)\]\((?:prompt|ai):([^)]+)\)/g, (_match, alt, promptText) => {
+      const cleanPrompt = promptText.trim();
+      const cleanAlt = alt.trim() || 'Minh họa AI';
+      const existingImg = previewAiImages[cleanPrompt];
+
+      if (existingImg) {
+        return `\n\n<div class="my-4 p-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/30 text-center shadow-xs"><img src="${existingImg}" alt="${cleanAlt}" class="max-h-72 w-auto mx-auto rounded-xl shadow-md object-contain" /><p class="text-xs italic text-slate-500 mt-2 font-medium">✦ ${cleanAlt}: "${cleanPrompt}" ✦</p></div>\n\n`;
+      }
+
+      return `\n\n<div class="my-4 p-4 rounded-2xl border-2 border-dashed border-indigo-300/80 bg-gradient-to-r from-indigo-50/60 via-purple-50/60 to-pink-50/60 text-center flex flex-col items-center justify-center gap-2"><div class="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-xs font-bold shadow-xs"><span>🤖 Placeholder Ảnh AI (prompt:...)</span></div><p class="text-xs font-bold text-slate-800 max-w-md">"${cleanPrompt}"</p><p class="text-[11px] text-slate-500 italic">Ảnh sẽ được tự động tạo và nhúng thật khi bạn xuất file Word, PPTX, PDF hoặc Excel.</p></div>\n\n`;
+    });
+  }, [normalizedContent, previewAiImages]);
+
   // Parse markdown into clean HTML
   const parsedMarkdownHtml = React.useMemo(() => {
-    if (!normalizedContent.trim()) return '';
+    if (!previewHtmlReadyMarkdown.trim()) return '';
     try {
-      return marked.parse(normalizedContent, { gfm: true, breaks: true }) as string;
+      return marked.parse(previewHtmlReadyMarkdown, { gfm: true, breaks: true }) as string;
     } catch (e) {
-      return normalizedContent;
+      return previewHtmlReadyMarkdown;
     }
-  }, [normalizedContent]);
+  }, [previewHtmlReadyMarkdown]);
 
   // PowerPoint Slide Chunks
   const slideChunks = React.useMemo(() => {
@@ -203,89 +227,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             {/* Simulated A4 Page */}
             <div className="bg-white rounded-lg shadow-xl border border-slate-200/90 p-8 sm:p-12 transition-all min-h-[580px] flex flex-col justify-between">
               {data.includeCoverPage && wordViewMode === 'cover' ? (
-                /* THEME-SPECIFIC COVER PAGE VIEW */
-                <div className="flex flex-col items-center justify-center text-center my-auto py-6">
-                  {/* Theme Motif Crest */}
-                  <div className="text-3xl mb-2">{theme.cover.icons}</div>
-
-                  {/* Theme Badge */}
-                  <div
-                    className="text-xs font-bold tracking-widest uppercase mb-4 px-4 py-1.5 rounded-full border shadow-2xs"
-                    style={{
-                      borderColor: `#${theme.primaryHex}40`,
-                      color: `#${theme.primaryHex}`,
-                      backgroundColor: `#${theme.primaryHex}10`,
-                    }}
-                  >
-                    {theme.cover.badge}
-                  </div>
-
-                  {/* Title */}
-                  <h1
-                    className={`text-2xl sm:text-4xl font-extrabold tracking-tight mb-3 ${theme.fontClassTitle}`}
-                    style={{ color: `#${theme.primaryHex}` }}
-                  >
-                    {data.title || 'Tiêu Đề Tài Liệu'}
-                  </h1>
-
-                  {/* Subtitle */}
-                  {data.subtitle && (
-                    <p
-                      className="italic text-sm sm:text-base mb-4 max-w-md font-medium"
-                      style={{ color: `#${theme.paperAccentHex}` }}
-                    >
-                      {data.subtitle}
-                    </p>
-                  )}
-
-                  {/* Divider */}
-                  <div
-                    className="text-sm font-bold my-2"
-                    style={{ color: `#${theme.primaryHex}` }}
-                  >
-                    ✦ ──────────────────────── ✦
-                  </div>
-
-                  {/* Theme Quote */}
-                  {theme.cover.quote && (
-                    <p
-                      className="text-xs italic max-w-md my-3 px-4 py-1.5 rounded-lg border border-dashed"
-                      style={{
-                        borderColor: `#${theme.primaryHex}30`,
-                        color: `#${theme.paperAccentHex}`,
-                        backgroundColor: `#${theme.primaryHex}06`,
-                      }}
-                    >
-                      “{theme.cover.quote}”
-                    </p>
-                  )}
-
-                  {/* Metadata Card Table */}
-                  <div className="w-full max-w-sm mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-2xs text-left text-xs divide-y divide-slate-100 bg-slate-50/50">
-                    <div className="flex px-4 py-2.5">
-                      <span className="w-36 font-bold text-slate-500">Tác giả biên soạn:</span>
-                      <span className="font-semibold text-slate-900">{data.author || 'Chưa đặt'}</span>
-                    </div>
-                    <div className="flex px-4 py-2.5">
-                      <span className="w-36 font-bold text-slate-500">Đơn vị thực hiện:</span>
-                      <span className="text-slate-800">{data.organization || 'Hệ thống Quản trị Tài liệu'}</span>
-                    </div>
-                    <div className="flex px-4 py-2.5">
-                      <span className="w-36 font-bold text-slate-500">Ngày phát hành:</span>
-                      <span className="text-slate-800">{data.date || new Date().toLocaleDateString('vi-VN')}</span>
-                    </div>
-                    <div className="flex px-4 py-2.5">
-                      <span className="w-36 font-bold text-slate-500">Chủ đề thiết kế:</span>
-                      <span className="font-bold" style={{ color: `#${theme.primaryHex}` }}>
-                        {theme.name} • {theme.subtitle}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-400 mt-8 italic">
-                    [ Bắt đầu nội dung chính tại Trang 2 ]
-                  </p>
-                </div>
+                /* THEME-SPECIFIC UNIQUE COVER PAGE VIEW */
+                <DocumentCoverView data={data} theme={theme} mode="preview" />
               ) : (
                 /* MAIN CONTENT VIEW */
                 <div>
@@ -322,7 +265,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     </div>
                   </div>
 
-                  {/* Body Content with rich Markdown formatting & NO raw asterisks */}
+                  {/* Body Content with rich Markdown formatting & high contrast tables */}
                   {parsedMarkdownHtml ? (
                     <div
                       className={`markdown-preview ${theme.fontClassBody}`}
@@ -330,6 +273,12 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                         {
                           '--theme-primary': `#${theme.primaryHex}`,
                           '--theme-accent': `#${theme.paperAccentHex}`,
+                          '--theme-table-border': '#CBD5E1',
+                          '--theme-table-header-bg': `#${theme.primaryHex}`,
+                          '--theme-table-header-text': '#FFFFFF',
+                          '--theme-table-cell-bg': '#FFFFFF',
+                          '--theme-table-cell-alt': '#F8FAFC',
+                          '--theme-table-cell-text': `#${theme.paperTextHex}`,
                           color: `#${theme.paperTextHex}`,
                         } as React.CSSProperties
                       }
@@ -371,56 +320,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             >
               {/* SLIDE 0: TITLE SLIDE (Only if includeCoverPage === true) */}
               {hasCoverSlide && currentSlideIndex === 0 ? (
-                <div className="h-full flex flex-col justify-center items-center text-center p-4">
-                  {/* Decorative Frame */}
-                  <div
-                    className="absolute inset-4 sm:inset-6 border-2 rounded-xl pointer-events-none"
-                    style={{
-                      borderColor: `#${theme.primaryHex}60`,
-                      backgroundColor: `#${theme.cardBgHex}30`,
-                    }}
-                  />
-
-                  <div className="relative z-10 max-w-lg">
-                    <span className="text-3xl mb-1 inline-block">{theme.cover.icons}</span>
-                    <span
-                      className="block text-[11px] font-bold uppercase tracking-wider mb-2"
-                      style={{ color: `#${theme.slideAccentHex}` }}
-                    >
-                      {theme.cover.badge}
-                    </span>
-                    <h1
-                      className={`text-xl sm:text-3xl font-extrabold tracking-tight mb-2 ${theme.fontClassTitle}`}
-                      style={{ color: `#${theme.primaryHex}` }}
-                    >
-                      {data.title || 'Tiêu Đề Bài Thuyết Trình'}
-                    </h1>
-                    {data.subtitle && (
-                      <p
-                        className="text-xs sm:text-sm font-medium mb-3 italic"
-                        style={{ color: `#${theme.slideAccentHex}` }}
-                      >
-                        {data.subtitle}
-                      </p>
-                    )}
-                    {theme.cover.quote && (
-                      <p
-                        className="text-[11px] italic mb-4 max-w-md opacity-90"
-                        style={{ color: `#${theme.slideTextHex}` }}
-                      >
-                        “{theme.cover.quote}”
-                      </p>
-                    )}
-                    <div
-                      className="text-[11px] font-sans flex items-center justify-center gap-2 flex-wrap"
-                      style={{ color: `#${theme.slideTextHex}` }}
-                    >
-                      {data.author && <span>Tác giả: {data.author}</span>}
-                      {data.date && <span>• Ngày: {data.date}</span>}
-                      <span>• Ấn bản: {theme.name}</span>
-                    </div>
-                  </div>
-                </div>
+                <DocumentCoverView data={data} theme={theme} mode="slide" />
               ) : (
                 /* CONTENT SLIDES (Clean parsed markdown without raw syntax) */
                 <div className="h-full flex flex-col justify-between relative z-10">
@@ -502,6 +402,66 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                                   </span>
                                 ))}
                               </span>
+                            </div>
+                          );
+                        } else if (item.type === 'table' && item.tableData && item.tableData.length > 0) {
+                          // High-contrast PowerPoint table preview
+                          return (
+                            <div
+                              key={iIdx}
+                              className="overflow-x-auto my-2 rounded-lg border shadow-xs"
+                              style={{ borderColor: `#${theme.borderHex || theme.primaryHex}60` }}
+                            >
+                              <table className="w-full text-[11px] border-collapse">
+                                <tbody>
+                                  {item.tableData.map((row, rIdx) => (
+                                    <tr
+                                      key={rIdx}
+                                      style={{
+                                        backgroundColor:
+                                          rIdx === 0
+                                            ? `#${theme.primaryHex}`
+                                            : rIdx % 2 === 0
+                                            ? `#${theme.cardBgHex}`
+                                            : isDarkTheme
+                                            ? `rgba(${theme.rgb.bg.join(',')}, 0.95)`
+                                            : '#F8FAFC',
+                                        color: rIdx === 0 ? '#FFFFFF' : `#${theme.slideTextHex}`,
+                                      }}
+                                    >
+                                      {row.map((cell, cIdx) => (
+                                        <td
+                                          key={cIdx}
+                                          className={`p-1.5 border ${rIdx === 0 ? 'font-bold' : ''}`}
+                                          style={{ borderColor: `#${theme.borderHex || theme.primaryHex}40` }}
+                                        >
+                                          {cell}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        } else if (item.type === 'image' && item.imageUrl) {
+                          return (
+                            <div
+                              key={iIdx}
+                              className="my-2 p-1.5 rounded-xl border flex flex-col items-center justify-center bg-black/20"
+                              style={{ borderColor: `#${theme.primaryHex}40` }}
+                            >
+                              <img
+                                src={item.imageUrl}
+                                alt={item.imageAlt || 'Minh họa'}
+                                className="max-h-36 w-auto rounded-lg object-contain shadow-sm"
+                                referrerPolicy="no-referrer"
+                              />
+                              {item.imageAlt && (
+                                <span className="text-[10px] italic mt-1" style={{ color: `#${theme.slideAccentHex}` }}>
+                                  {item.imageAlt}
+                                </span>
+                              )}
                             </div>
                           );
                         } else {
@@ -610,45 +570,43 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
               {/* Cover Elements (If includeCoverPage === true) */}
               {data.includeCoverPage && (
-                <div className="text-center mb-6 pb-6 border-b border-dashed" style={{ borderColor: `#${theme.primaryHex}40` }}>
-                  <div className="text-2xl mb-1">{theme.cover.icons}</div>
-                  <div
-                    className="inline-block text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2"
-                    style={{ backgroundColor: `#${theme.primaryHex}20`, color: `#${theme.primaryHex}` }}
+                <div className="mb-8">
+                  <DocumentCoverView data={data} theme={theme} mode="pdf" />
+                </div>
+              )}
+
+              {/* Title Header (When NO cover page is included) */}
+              {!data.includeCoverPage && (
+                <div className="mb-6 pb-4 border-b" style={{ borderColor: `#${theme.primaryHex}40` }}>
+                  <h1
+                    className={`text-2xl sm:text-3xl font-bold text-center tracking-tight mb-2 ${theme.fontClassTitle}`}
+                    style={{ color: `#${theme.primaryHex}` }}
                   >
-                    {theme.cover.badge}
+                    {data.title || 'Tài Liệu Văn Bản'}
+                  </h1>
+
+                  {data.subtitle && (
+                    <p
+                      className="text-center italic text-xs sm:text-sm mb-4"
+                      style={{ color: `#${theme.slideAccentHex}` }}
+                    >
+                      {data.subtitle}
+                    </p>
+                  )}
+
+                  {/* Metadata */}
+                  <div
+                    className="text-center text-[11px] pb-2"
+                    style={{ color: isDarkTheme ? `#${theme.slideTextHex}cc` : '#64748B' }}
+                  >
+                    {data.author && <span>Tác giả: {data.author} | </span>}
+                    {data.date && <span>Ngày: {data.date} | </span>}
+                    <span>Phong cách: {theme.name}</span>
                   </div>
                 </div>
               )}
 
-              {/* Title */}
-              <h1
-                className={`text-2xl sm:text-3xl font-bold text-center tracking-tight mb-2 ${theme.fontClassTitle}`}
-                style={{ color: `#${theme.primaryHex}` }}
-              >
-                {data.title || 'Tài Liệu Văn Bản'}
-              </h1>
-
-              {data.subtitle && (
-                <p
-                  className="text-center italic text-xs sm:text-sm mb-4"
-                  style={{ color: `#${theme.slideAccentHex}` }}
-                >
-                  {data.subtitle}
-                </p>
-              )}
-
-              {/* Metadata */}
-              <div
-                className="text-center text-[11px] mb-6 pb-2"
-                style={{ color: `#${theme.slideTextHex}cc` }}
-              >
-                {data.author && <span>Tác giả: {data.author} | </span>}
-                {data.date && <span>Ngày: {data.date} | </span>}
-                <span>Phong cách: {theme.name}</span>
-              </div>
-
-              {/* Parsed Markdown Body in PDF Preview (NO raw markdown) */}
+              {/* Parsed Markdown Body in PDF Preview with Dark Theme High Contrast Tables */}
               {parsedMarkdownHtml ? (
                 <div
                   className={`markdown-preview ${theme.fontClassBody}`}
@@ -656,7 +614,13 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     {
                       '--theme-primary': `#${theme.primaryHex}`,
                       '--theme-accent': `#${theme.slideAccentHex}`,
-                      color: `#${theme.slideTextHex}`,
+                      '--theme-table-border': isDarkTheme ? `#${theme.primaryHex}60` : '#CBD5E1',
+                      '--theme-table-header-bg': `#${theme.primaryHex}`,
+                      '--theme-table-header-text': '#FFFFFF',
+                      '--theme-table-cell-bg': isDarkTheme ? `rgba(${theme.rgb.bg.join(',')}, 0.95)` : '#FFFFFF',
+                      '--theme-table-cell-alt': isDarkTheme ? `rgba(${theme.rgb.primary.join(',')}, 0.2)` : '#F8FAFC',
+                      '--theme-table-cell-text': isDarkTheme ? `#${theme.slideTextHex}` : '#1E293B',
+                      color: isDarkTheme ? `#${theme.slideTextHex}` : '#1E293B',
                     } as React.CSSProperties
                   }
                   dangerouslySetInnerHTML={{ __html: parsedMarkdownHtml }}

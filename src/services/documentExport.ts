@@ -12,6 +12,8 @@ import {
   stripMarkdown,
   parsePptxSlideContent,
 } from './markdownParser';
+import { resolveMarkdownImagesForExport } from './aiImageService';
+import { getThemeSvgDataUrl } from '../data/themeArtwork';
 
 // Helper to sanitize file names
 export function sanitizeFilename(name: string): string {
@@ -78,9 +80,14 @@ export function chunkContentForSlides(
 export async function exportWord(
   docData: DocumentData,
   theme: DocumentTheme,
-  returnBlobOnly = false
+  returnBlobOnly = false,
+  onProgress?: (msg: string) => void
 ): Promise<Blob> {
-  const doc = convertMarkdownToDocx(docData, theme);
+  // Pre-resolve any AI image prompts into real image data URLs
+  const { resolvedMarkdown } = await resolveMarkdownImagesForExport(docData.content, theme, onProgress);
+  const updatedDocData = { ...docData, content: resolvedMarkdown };
+
+  const doc = convertMarkdownToDocx(updatedDocData, theme);
   const blob = await Packer.toBlob(doc);
   if (!returnBlobOnly) {
     const filename = `${sanitizeFilename(docData.title)}_${theme.name}.docx`;
@@ -89,12 +96,17 @@ export async function exportWord(
   return blob;
 }
 
-// 2. EXPORT POWERPOINT (.pptx) - Clean, parsed typography without raw markdown
+// 2. EXPORT POWERPOINT (.pptx) - Clean, parsed typography with theme cover artwork & tables
 export async function exportPowerPoint(
   docData: DocumentData,
   theme: DocumentTheme,
-  returnBlobOnly = false
+  returnBlobOnly = false,
+  onProgress?: (msg: string) => void
 ): Promise<Blob> {
+  // Pre-resolve any AI image prompts into real image data URLs
+  const { resolvedMarkdown } = await resolveMarkdownImagesForExport(docData.content, theme, onProgress);
+  const updatedDocData = { ...docData, content: resolvedMarkdown };
+
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
 
@@ -102,7 +114,7 @@ export async function exportPowerPoint(
   const bodyFont = 'Arial';
 
   // ===================== TITLE SLIDE (Only if includeCoverPage === true) =====================
-  if (docData.includeCoverPage) {
+  if (updatedDocData.includeCoverPage) {
     const titleSlide = pptx.addSlide();
     titleSlide.background = { color: theme.bgHex };
 
@@ -113,57 +125,72 @@ export async function exportPowerPoint(
       w: 12.13,
       h: 6.5,
       line: { color: theme.primaryHex, width: 2 },
-      fill: { color: theme.cardBgHex, transparency: 20 },
+      fill: { color: theme.cardBgHex, transparency: 15 },
     });
 
+    // Embed Dedicated Theme Vector Illustration on Right
+    try {
+      const artworkDataUrl = getThemeSvgDataUrl(theme.id);
+      titleSlide.addImage({
+        data: artworkDataUrl,
+        x: 7.2,
+        y: 1.4,
+        w: 5.0,
+        h: 2.81,
+      });
+    } catch (e) {
+      console.warn('Title slide artwork embed error:', e);
+    }
+
+    // Left Column Content:
     // Theme Motif Icons
     titleSlide.addText(theme.cover.icons, {
       x: 1.0,
       y: 1.0,
-      w: 11.33,
-      h: 0.6,
+      w: 5.8,
+      h: 0.5,
       fontSize: 22,
       color: theme.primaryHex,
-      align: 'center',
+      align: 'left',
     });
 
     // Theme Badge
     titleSlide.addText(theme.cover.badge, {
       x: 1.0,
-      y: 1.7,
-      w: 11.33,
-      h: 0.5,
-      fontSize: 13,
+      y: 1.6,
+      w: 5.8,
+      h: 0.45,
+      fontSize: 12,
       bold: true,
       color: theme.slideAccentHex,
-      align: 'center',
+      align: 'left',
       fontFace: titleFont,
     });
 
     // Document Title
-    titleSlide.addText(docData.title || 'Tài Liệu Thuyết Trình', {
+    titleSlide.addText(updatedDocData.title || 'Tài Liệu Thuyết Trình', {
       x: 1.0,
-      y: 2.3,
-      w: 11.33,
-      h: 1.5,
-      fontSize: 32,
+      y: 2.2,
+      w: 5.8,
+      h: 1.4,
+      fontSize: 28,
       bold: true,
       color: theme.primaryHex,
-      align: 'center',
+      align: 'left',
       fontFace: titleFont,
     });
 
     // Subtitle
-    if (docData.subtitle) {
-      titleSlide.addText(docData.subtitle, {
-        x: 1.2,
-        y: 3.8,
-        w: 10.93,
-        h: 0.7,
-        fontSize: 16,
+    if (updatedDocData.subtitle) {
+      titleSlide.addText(updatedDocData.subtitle, {
+        x: 1.0,
+        y: 3.7,
+        w: 5.8,
+        h: 0.6,
+        fontSize: 15,
         italic: true,
         color: theme.slideAccentHex,
-        align: 'center',
+        align: 'left',
         fontFace: bodyFont,
       });
     }
@@ -312,6 +339,57 @@ export async function exportPowerPoint(
           fontFace: bodyFont,
         });
         currentY += 0.45;
+      } else if (item.type === 'table' && item.tableData && item.tableData.length > 0) {
+        // High-contrast PowerPoint table rendering
+        const numCols = Math.max(...item.tableData.map((r) => r.length), 1);
+        const colWidth = 11.33 / numCols;
+
+        const tableRows = item.tableData.map((row, rIdx) => {
+          const isHeader = rIdx === 0;
+          return row.map((cellText) => ({
+            text: cellText,
+            options: {
+              fontSize: isHeader ? 12 : 11,
+              bold: isHeader,
+              color: isHeader ? 'FFFFFF' : theme.slideTextHex,
+              fill: isHeader
+                ? { color: theme.primaryHex }
+                : rIdx % 2 === 0
+                ? { color: theme.cardBgHex }
+                : { color: theme.bgHex },
+              align: 'left' as const,
+              valign: 'middle' as const,
+              fontFace: bodyFont,
+            },
+          }));
+        });
+
+        try {
+          slide.addTable(tableRows, {
+            x: 1.0,
+            y: currentY,
+            w: 11.33,
+            colW: Array(numCols).fill(colWidth),
+            border: { type: 'solid', pt: 1, color: theme.borderHex || theme.primaryHex },
+          });
+          currentY += Math.min(2.8, tableRows.length * 0.38 + 0.3);
+        } catch (tableErr) {
+          console.warn('PowerPoint slide addTable error:', tableErr);
+          currentY += 0.5;
+        }
+      } else if (item.type === 'image' && item.imageUrl) {
+        try {
+          slide.addImage({
+            data: item.imageUrl,
+            x: 2.2,
+            y: currentY,
+            w: 8.93,
+            h: 3.2,
+          });
+          currentY += 3.35;
+        } catch (imgErr) {
+          console.warn('PowerPoint slide image add error:', imgErr);
+        }
       } else {
         // Normal paragraph
         const textRuns = item.runs.map((r) => ({
@@ -544,8 +622,13 @@ export async function exportPDF(
   docData: DocumentData,
   theme: DocumentTheme,
   previewElement?: HTMLElement | null,
-  returnBlobOnly = false
+  returnBlobOnly = false,
+  onProgress?: (msg: string) => void
 ): Promise<Blob> {
+  // Pre-resolve any AI image prompts into real image data URLs
+  const { resolvedMarkdown } = await resolveMarkdownImagesForExport(docData.content, theme, onProgress);
+  const updatedDocData = { ...docData, content: resolvedMarkdown };
+
   // Locate print container if previewElement is not directly passed
   const targetElement =
     previewElement ||
